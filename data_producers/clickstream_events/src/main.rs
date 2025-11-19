@@ -164,12 +164,28 @@ fn random_value<T: Clone>(values: &[T]) -> T {
 }
 
 fn main() {
-    println!("How many threads do you want to spawn?");
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer).expect("Failed to read line");
+    println!("How many threads do you want to spawn? (press Enter for default: 1)");
+
+    let num_threads: usize = loop {
+        let mut buffer = String::new();
+        io::stdin().read_line(&mut buffer).expect("Failed to read line");
+        let input = buffer.trim();
+
+        if input.is_empty() {
+            println!("No input received; defaulting to 1 thread.");
+            break 1usize;
+        }
+
+        match input.parse::<usize>() {
+            Ok(n) if n > 0 => break n,
+            _ => {
+                println!("Please enter a positive integer (or press Enter for default):");
+                continue;
+            }
+        }
+    };
 
     println!("Starting clickstream event producer...");
-    let num_threads: usize = buffer.trim().parse().expect("Please enter a valid number");
 
     let mut handles = Vec::new();
 
