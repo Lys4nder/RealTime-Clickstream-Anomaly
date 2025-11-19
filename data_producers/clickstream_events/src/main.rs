@@ -3,6 +3,7 @@ use rand::{rng, Rng};
 use serde::Serialize;
 use std::io;
 use std::thread;
+mod handle_parquet;
 
 #[derive(Debug, Serialize, Clone)]
 struct ClickEvent {
@@ -145,25 +146,25 @@ fn random_ip_address() -> String {
     let mut rng = rng();
     format!(
         "{}.{}.{}.{}",
-        rng.gen_range(1..=255),
-        rng.gen_range(0..=255),
-        rng.gen_range(0..=255),
-        rng.gen_range(1..=255)
+        rng.random_range(1..=255),
+        rng.random_range(0..=255),
+        rng.random_range(0..=255),
+        rng.random_range(1..=255)
     )
 }
 
 fn random_sleep() {
     let mut rng = rng();
-    let sleep_duration = rng.gen_range(100..500);
+    let sleep_duration = rng.random_range(100..500);
     thread::sleep(std::time::Duration::from_millis(sleep_duration));
 }
 
 fn random_value<T: Clone>(values: &[T]) -> T {
     let mut rng = rng();
-    values[rng.gen_range(0..values.len())].clone()
+    values[rng.random_range(0..values.len())].clone()
 }
 
-fn main() {
+fn generate() {
     println!("How many threads do you want to spawn? (press Enter for default: 1)");
 
     let num_threads: usize = loop {
@@ -195,7 +196,7 @@ fn main() {
             let mut click_sequence = 0u32;
 
             let session_id = format!("session_{}", thread_id); //TODO improve session id generation
-            let user_id = format!("user_{}", rng.gen_range(1000..9999)); //TODO improve user id generation
+            let user_id = format!("user_{}", rng.random_range(1000..9999)); //TODO improve user id generation
 
             loop {
                 let event = ClickEvent {
@@ -206,7 +207,7 @@ fn main() {
                     country: random_value(&CountryCodes::VARIANTS),
                     click_sequence,
                     page_category: random_value(&PageCategory::VARIANTS),
-                    product_code: format!("PROD{}", rng.gen_range(1000..9999)),
+                    product_code: format!("PROD{}", rng.random_range(1000..9999)),
                     action_type: random_value(&ActionType::VARIANTS),
                     device_type: random_value(&DeviceType::VARIANTS),
                     page_section: random_value(&PageSection::VARIANTS),
@@ -224,4 +225,8 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
+}
+
+fn main() {
+    generate();
 }
