@@ -57,16 +57,17 @@ def generate_timestamps(n_rows: int):
     sampled_minutes = np.random.randint(0, 60, size=n_rows)
     sampled_seconds = np.random.randint(0, 60, size=n_rows)
 
-    timestamps = []
-    for d, h, m, s in zip(sampled_days, sampled_hours, sampled_minutes, sampled_seconds):
-        d = pd.Timestamp(d).to_pydatetime()
-
-        ts = datetime(d.year, d.month, d.day, int(h), int(m), int(s))
-        timestamps.append(ts)
-
-    return timestamps
-
-
+    # Vectorized timestamp construction using pandas
+    df = pd.DataFrame({
+        'year': pd.DatetimeIndex(sampled_days).year,
+        'month': pd.DatetimeIndex(sampled_days).month,
+        'day': pd.DatetimeIndex(sampled_days).day,
+        'hour': sampled_hours,
+        'minute': sampled_minutes,
+        'second': sampled_seconds
+    })
+    timestamps = pd.to_datetime(df)
+    return timestamps.to_pydatetime().tolist()
 def choose_order_status(payment_method: str) -> str:
     statuses = ["COMPLETED", "FAILED", "PENDING", "RETURNED"]
     if payment_method == "BANK_TRANSFER":
