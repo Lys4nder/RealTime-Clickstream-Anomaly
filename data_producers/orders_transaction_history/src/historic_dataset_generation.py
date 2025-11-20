@@ -95,7 +95,7 @@ payment_method_list = [random.choice(PAYMENT_METHODS) for _ in range(NUM_ROWS)]
 order_status_list = [choose_order_status(pm) for pm in payment_method_list]
 
 data = {
-    "order_id": [str(uuid.uuid4()) for _ in range(NUM_ROWS)],
+    "order_id": [str(uuid.uuid5(uuid.NAMESPACE_DNS, f"order-{i}")) for i in range(NUM_ROWS)],
     "session_id": [random.randint(100000, 999999) for _ in range(NUM_ROWS)],
     "user_id": [f"user_{random.randint(1, 3000)}" for _ in range(NUM_ROWS)],
     "transaction_timestamp": transaction_timestamps,
