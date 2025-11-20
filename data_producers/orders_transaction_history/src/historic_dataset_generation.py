@@ -68,14 +68,12 @@ def generate_timestamps(n_rows: int):
 
 
 def choose_order_status(payment_method: str) -> str:
+    statuses = ["COMPLETED", "FAILED", "PENDING", "RETURNED"]
     if payment_method == "BANK_TRANSFER":
-        statuses = ["COMPLETED", "FAILED", "PENDING", "RETURNED"]
         weights = [0.6, 0.15, 0.2, 0.05]
     elif payment_method == "GIFT_CARD":
-        statuses = ["COMPLETED", "FAILED", "PENDING", "RETURNED"]
         weights = [0.85, 0.05, 0.05, 0.05]
     else:
-        statuses = ["COMPLETED", "FAILED", "PENDING", "RETURNED"]
         weights = [0.82, 0.08, 0.05, 0.05]
     return random.choices(statuses, weights=weights, k=1)[0]
 
