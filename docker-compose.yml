@@ -1,4 +1,5 @@
 services:
+  # Infrastructure
   zookeeper:
     image: wurstmeister/zookeeper
     container_name: zookeeper
@@ -23,10 +24,27 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
     volumes:
-      # Mounting the docker socke
+      # Mounting the docker socket
       - /var/run/docker.sock:/var/run/docker.sock
       # Persistence
       - kafka_data:/kafka
+
+  # Clickstream Events Producer
+  clickstream-producer:
+    build: 
+      context: ./data_producers/clickstream_events
+      dockerfile: Dockerfile
+    
+    depends_on:
+      - kafka
+    
+    # Connection details
+    environment:
+      - KAFKA_BROKER=kafka:29092
+      - KAFKA_TOPIC=clickstream_events
+      - NUM_THREADS=1
+      - RUST_LOG=info
+      - MAX_EVENTS=1000
 
 volumes:
   kafka_data:
