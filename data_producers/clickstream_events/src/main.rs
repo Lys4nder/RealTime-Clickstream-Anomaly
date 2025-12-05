@@ -1,9 +1,12 @@
 use chrono::{DateTime, Utc};
 use rand::{rng, Rng};
 use serde::Serialize;
-use std::io;
 use std::thread;
+use std::sync::Arc;
 mod handle_parquet;
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{BaseRecord, ThreadedProducer, DefaultProducerContext};
+use std::env;
 
 #[derive(Debug, Serialize, Clone)]
 struct ClickEvent {
@@ -164,41 +167,28 @@ fn random_value<T: Clone>(values: &[T]) -> T {
     values[rng.random_range(0..values.len())].clone()
 }
 
-fn generate() {
-    println!("How many threads do you want to spawn? (press Enter for default: 1)");
+fn generate(producer: Arc<ThreadedProducer<DefaultProducerContext>>, topic_name: String, max_events: usize) {
 
-    let num_threads: usize = loop {
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer).expect("Failed to read line");
-        let input = buffer.trim();
+    let num_threads = env::var("NUM_THREADS")
+            .unwrap_or_else(|_| "1".to_string())
+            .parse::<usize>()
+            .unwrap_or(1);
 
-        if input.is_empty() {
-            println!("No input received; defaulting to 1 thread.");
-            break 1usize;
-        }
-
-        match input.parse::<usize>() {
-            Ok(n) if n > 0 => break n,
-            _ => {
-                println!("Please enter a positive integer (or press Enter for default):");
-                continue;
-            }
-        }
-    };
-
-    println!("Starting clickstream event producer...");
+    println!("Starting clickstream event producer with {} threads...", num_threads);
 
     let mut handles = Vec::new();
 
     for thread_id in 0..num_threads {
+        let producer = Arc::clone(&producer);
+        let topic = topic_name.clone();
+
         let handle = thread::spawn(move || {
             let mut rng = rng();
             let mut click_sequence = 0u32;
+            let session_id = format!("session_{}", thread_id);
+            let user_id = format!("user_{}", rng.random_range(1000..9999));
 
-            let session_id = format!("session_{}", thread_id); //TODO improve session id generation
-            let user_id = format!("user_{}", rng.random_range(1000..9999)); //TODO improve user id generation
-
-            loop {
+            for _ in 0..max_events {
                 let event = ClickEvent {
                     event_timestamp: Utc::now(),
                     session_id: session_id.clone(),
@@ -213,7 +203,18 @@ fn generate() {
                     page_section: random_value(&PageSection::VARIANTS),
                 };
 
-                println!("{}", serde_json::to_string(&event).unwrap());
+                let json_string = serde_json::to_string(&event).unwrap();
+
+                if let Err((e, _)) = producer.send(
+                    BaseRecord::to(&topic)
+                        .payload(&json_string)
+                        .key(&user_id),
+                ) {
+                    eprintln!("Error sending message: {:?}", e);
+                } else {
+                    println!("Sent: {}", json_string);
+                }
+
                 click_sequence += 1;
                 random_sleep();
             }
@@ -228,5 +229,25 @@ fn generate() {
 }
 
 fn main() {
-    generate();
+    env_logger::init();
+
+    // Read Env Vars
+    let broker = env::var("KAFKA_BROKER").unwrap_or_else(|_| "localhost:9092".to_string());
+    let topic = env::var("KAFKA_TOPIC").expect("KAFKA_TOPIC must be set");
+    let max_events = env::var("MAX_EVENTS")
+        .unwrap_or_else(|_| "1000".to_string())
+        .parse::<usize>()
+        .unwrap_or(1000);
+
+    println!("Connecting to Kafka at: {}", broker);
+    println!("Max events per thread: {}", max_events);
+
+    let producer: ThreadedProducer<DefaultProducerContext> = ClientConfig::new()
+        .set("bootstrap.servers", &broker)
+        .set("message.timeout.ms", "5000")
+        .create()
+        .expect("Producer creation error");
+
+    let producer = Arc::new(producer);
+    generate(producer, topic, max_events);
 }
