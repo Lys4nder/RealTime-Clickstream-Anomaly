@@ -5,8 +5,8 @@ services:
     container_name: zookeeper
     ports:
       - "2181:2181"
-  networks:
-    - app-tier
+    networks:
+      - app-tier
   kafka:
     image: wurstmeister/kafka
     container_name: kafka
