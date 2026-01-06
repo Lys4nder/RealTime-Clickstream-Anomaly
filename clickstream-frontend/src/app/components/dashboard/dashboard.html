@@ -1,0 +1,135 @@
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <h1>Clickstream Analytics Dashboard</h1>
+    <p class="subtitle">Real-time monitoring and anomaly detection</p>
+  </header>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card total">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <h3>Total Events</h3>
+        <p class="stat-value">{{ totalEvents }}</p>
+      </div>
+    </div>
+    
+    <div class="stat-card normal">
+      <div class="stat-icon">✓</div>
+      <div class="stat-content">
+        <h3>Normal Events</h3>
+        <p class="stat-value">{{ normalCount }}</p>
+        <span class="stat-percentage">{{ getPercentage(normalCount) | number:'1.1-1' }}%</span>
+      </div>
+    </div>
+    
+    <div class="stat-card suspicious">
+      <div class="stat-icon">⚠</div>
+      <div class="stat-content">
+        <h3>Suspicious Events</h3>
+        <p class="stat-value">{{ suspiciousCount }}</p>
+        <span class="stat-percentage">{{ getPercentage(suspiciousCount) | number:'1.1-1' }}%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Events by Category</h3>
+      <div class="chart-bars">
+        <div class="bar-item" *ngFor="let entry of getObjectEntries(categoryStats)">
+          <span class="bar-label">{{ entry[0] }}</span>
+          <div class="bar-container">
+            <div class="bar-fill" [style.width.%]="getPercentage(entry[1])"></div>
+          </div>
+          <span class="bar-value">{{ entry[1] }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Action Types</h3>
+      <div class="chart-bars">
+        <div class="bar-item" *ngFor="let entry of getObjectEntries(actionTypeStats)">
+          <span class="bar-label">{{ entry[0] }}</span>
+          <div class="bar-container">
+            <div class="bar-fill action" [style.width.%]="getPercentage(entry[1])"></div>
+          </div>
+          <span class="bar-value">{{ entry[1] }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Device Types</h3>
+      <div class="chart-bars">
+        <div class="bar-item" *ngFor="let entry of getObjectEntries(deviceTypeStats)">
+          <span class="bar-label">{{ entry[0] }}</span>
+          <div class="bar-container">
+            <div class="bar-fill device" [style.width.%]="getPercentage(entry[1])"></div>
+          </div>
+          <span class="bar-value">{{ entry[1] }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h3>Countries</h3>
+      <div class="chart-bars">
+        <div class="bar-item" *ngFor="let entry of getObjectEntries(countryStats)">
+          <span class="bar-label">{{ entry[0] }}</span>
+          <div class="bar-container">
+            <div class="bar-fill country" [style.width.%]="getPercentage(entry[1])"></div>
+          </div>
+          <span class="bar-value">{{ entry[1] }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Events List -->
+  <div class="events-section">
+    <h2>Recent Events</h2>
+    <div class="events-table-container">
+      <table class="events-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Timestamp</th>
+            <th>Session ID</th>
+            <th>User ID</th>
+            <th>IP Address</th>
+            <th>Country</th>
+            <th>Category</th>
+            <th>Action</th>
+            <th>Device</th>
+            <th>Sequence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let event of clickEvents" 
+              [class.suspicious-row]="event.isSuspicious">
+            <td>
+              <span class="status-badge" [class.status-suspicious]="event.isSuspicious">
+                {{ event.isSuspicious ? '⚠ SUSPICIOUS' : '✓ Normal' }}
+              </span>
+            </td>
+            <td class="timestamp">{{ formatTimestamp(event.event_timestamp) }}</td>
+            <td>{{ event.session_id }}</td>
+            <td>{{ event.user_id }}</td>
+            <td class="monospace">{{ event.ip_address }}</td>
+            <td>{{ event.country }}</td>
+            <td>{{ event.page_category }}</td>
+            <td>{{ event.action_type }}</td>
+            <td>{{ event.device_type }}</td>
+            <td class="text-center">{{ event.click_sequence }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="clickEvents.length === 0" class="no-data">
+        <p>No events to display. Waiting for data...</p>
+      </div>
+    </div>
+  </div>
+</div>
