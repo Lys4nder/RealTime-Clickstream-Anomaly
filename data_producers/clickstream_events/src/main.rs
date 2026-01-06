@@ -185,38 +185,84 @@ fn generate(producer: Arc<ThreadedProducer<DefaultProducerContext>>, topic_name:
         let handle = thread::spawn(move || {
             let mut rng = rng();
             let mut click_sequence = 0u32;
-            let session_id = format!("session_{}", thread_id);
-            let user_id = format!("user_{}", rng.random_range(1000..9999));
+            let session_id = format!("session_{}", thread_id + 1);
 
             for _ in 0..max_events {
-                let event = ClickEvent {
-                    event_timestamp: Utc::now(),
-                    session_id: session_id.clone(),
-                    user_id: user_id.clone(),
-                    ip_address: random_ip_address(),
-                    country: random_value(&CountryCodes::VARIANTS),
-                    click_sequence,
-                    page_category: random_value(&PageCategory::VARIANTS),
-                    product_code: format!("PROD{}", rng.random_range(1000..9999)),
-                    action_type: random_value(&ActionType::VARIANTS),
-                    device_type: random_value(&DeviceType::VARIANTS),
-                    page_section: random_value(&PageSection::VARIANTS),
-                };
+                let is_suspicious = rng.random_range(1..=50) == 1;
+                let user_id = format!("user_{}", rng.random_range(1000..9999));
+                click_sequence = rng.random_range(1..50);
+                
+                if is_suspicious {
+                    let num_rapid_clicks = rng.random_range(5..=8);
+                    let suspicious_user_id = user_id.clone();
+                    let base_timestamp = Utc::now();
+                    let suspicious_ip = random_ip_address();
+                    let suspicious_country = random_value(&CountryCodes::VARIANTS);
+                    
+                    println!("Generating suspicious activity: {} rapid clicks for {}", num_rapid_clicks, suspicious_user_id);
+                    
+                    for i in 0..num_rapid_clicks {
+                        let timestamp = base_timestamp + chrono::Duration::milliseconds(i as i64 * rng.random_range(10..200));
+                        
+                        let event = ClickEvent {
+                            event_timestamp: timestamp,
+                            session_id: session_id.clone(),
+                            user_id: suspicious_user_id.clone(),
+                            ip_address: suspicious_ip.clone(),
+                            country: suspicious_country.clone(),
+                            click_sequence,
+                            page_category: random_value(&PageCategory::VARIANTS),
+                            product_code: format!("PROD{}", rng.random_range(1000..9999)),
+                            action_type: random_value(&ActionType::VARIANTS),
+                            device_type: random_value(&DeviceType::VARIANTS),
+                            page_section: random_value(&PageSection::VARIANTS),
+                        };
 
-                let json_string = serde_json::to_string(&event).unwrap();
+                        let json_string = serde_json::to_string(&event).unwrap();
 
-                if let Err((e, _)) = producer.send(
-                    BaseRecord::to(&topic)
-                        .payload(&json_string)
-                        .key(&user_id),
-                ) {
-                    eprintln!("Error sending message: {:?}", e);
+                        if let Err((e, _)) = producer.send(
+                            BaseRecord::to(&topic)
+                                .payload(&json_string)
+                                .key(&suspicious_user_id),
+                        ) {
+                            eprintln!("Error sending message: {:?}", e);
+                        } else {
+                            println!("Sent: {}", json_string);
+                        }
+
+                        click_sequence += 1;
+                    }
+                    
+                    thread::sleep(std::time::Duration::from_millis(100));
                 } else {
-                    println!("Sent: {}", json_string);
-                }
+                    let event = ClickEvent {
+                        event_timestamp: Utc::now(),
+                        session_id: session_id.clone(),
+                        user_id: user_id.clone(),
+                        ip_address: random_ip_address(),
+                        country: random_value(&CountryCodes::VARIANTS),
+                        click_sequence: click_sequence,
+                        page_category: random_value(&PageCategory::VARIANTS),
+                        product_code: format!("PROD{}", rng.random_range(1000..9999)),
+                        action_type: random_value(&ActionType::VARIANTS),
+                        device_type: random_value(&DeviceType::VARIANTS),
+                        page_section: random_value(&PageSection::VARIANTS),
+                    };
 
-                click_sequence += 1;
-                random_sleep();
+                    let json_string = serde_json::to_string(&event).unwrap();
+
+                    if let Err((e, _)) = producer.send(
+                        BaseRecord::to(&topic)
+                            .payload(&json_string)
+                            .key(&user_id),
+                    ) {
+                        eprintln!("Error sending message: {:?}", e);
+                    } else {
+                        println!("Sent: {}", json_string);
+                    }
+
+                    random_sleep();
+                }
             }
         });
 
