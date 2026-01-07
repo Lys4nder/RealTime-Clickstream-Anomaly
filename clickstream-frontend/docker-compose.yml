@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  clickstream-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clickstream-frontend
+    ports:
+      - "4200:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
