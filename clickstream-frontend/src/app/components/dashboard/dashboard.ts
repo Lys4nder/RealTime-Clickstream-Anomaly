@@ -13,12 +13,13 @@ export class Dashboard implements OnInit, OnDestroy {
   clickEvents: ClickEvent[] = [];
   private subscription?: Subscription;
   
-  // Statistics
+  // Expose Object to template
+  Object = Object;
+  
   totalEvents: number = 0;
   suspiciousCount: number = 0;
   normalCount: number = 0;
   
-  // Chart data
   categoryStats: { [key: string]: number } = {};
   actionTypeStats: { [key: string]: number } = {};
   deviceTypeStats: { [key: string]: number } = {};
@@ -57,13 +58,11 @@ export class Dashboard implements OnInit, OnDestroy {
     this.suspiciousCount = events.filter(e => e.isSuspicious).length;
     this.normalCount = this.totalEvents - this.suspiciousCount;
     
-    // Reset stats
     this.categoryStats = {};
     this.actionTypeStats = {};
     this.deviceTypeStats = {};
     this.countryStats = {};
     
-    // Calculate statistics
     events.forEach(event => {
       this.categoryStats[event.page_category] = (this.categoryStats[event.page_category] || 0) + 1;
       this.actionTypeStats[event.action_type] = (this.actionTypeStats[event.action_type] || 0) + 1;

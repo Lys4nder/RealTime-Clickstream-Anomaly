@@ -33,6 +33,87 @@
     </div>
   </div>
 
+  <!-- Placeholder Graphs -->
+  <div class="graphs-section">
+    <h2 class="section-title">Analytics Overview</h2>
+    <div class="graphs-grid">
+      <!-- Real-time Events Graph -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Real-time Event Stream</h3>
+          <span class="graph-badge">Live</span>
+        </div>
+        <div class="graph-placeholder">
+          <div class="placeholder-content">
+            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <polyline points="3 12 9 6 13 10 21 2"></polyline>
+              <path d="M21 2v6h-6"></path>
+            </svg>
+            <p>Time Series Graph</p>
+            <span class="placeholder-label">Events over time</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Anomaly Detection Graph -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Anomaly Detection Rate</h3>
+          <span class="graph-badge warning">Monitoring</span>
+        </div>
+        <div class="graph-placeholder">
+          <div class="placeholder-content">
+            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M18 20V10"></path>
+              <path d="M12 20V4"></path>
+              <path d="M6 20v-6"></path>
+            </svg>
+            <p>Bar Chart</p>
+            <span class="placeholder-label">Suspicious vs Normal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Geographic Distribution -->
+      <div class="graph-card wide">
+        <div class="graph-header">
+          <h3>Geographic Distribution</h3>
+          <span class="graph-badge info">{{ Object.keys(countryStats).length }} Countries</span>
+        </div>
+        <div class="graph-placeholder">
+          <div class="placeholder-content">
+            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M2 12h20"></path>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <p>World Map</p>
+            <span class="placeholder-label">Event distribution by location</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Behavior Pattern -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>User Behavior Patterns</h3>
+          <span class="graph-badge">Analysis</span>
+        </div>
+        <div class="graph-placeholder">
+          <div class="placeholder-content">
+            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 8v8"></path>
+              <path d="M8 12h8"></path>
+            </svg>
+            <p>Scatter Plot</p>
+            <span class="placeholder-label">Click sequences & patterns</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Charts Section -->
   <div class="charts-grid">
     <div class="chart-card">
@@ -88,9 +169,15 @@
     </div>
   </div>
 
-  <!-- Events List -->
+  <!-- Live Events List -->
   <div class="events-section">
-    <h2>Recent Events</h2>
+    <div class="section-header">
+      <h2 class="section-title">Live Event Stream</h2>
+      <div class="event-counter">
+        <span class="pulse-dot"></span>
+        <span>{{ clickEvents.length }} events</span>
+      </div>
+    </div>
     <div class="events-table-container">
       <table class="events-table">
         <thead>
