@@ -185,10 +185,11 @@ fn generate(producer: Arc<ThreadedProducer<DefaultProducerContext>>, topic_name:
         let handle = thread::spawn(move || {
             let mut rng = rng();
             let mut click_sequence = 0u32;
-            let session_id = format!("session_{}", thread_id);
-            let user_id = format!("user_{}", rng.random_range(1000..9999));
 
             for _ in 0..max_events {
+                let user_id = format!("user_{}", rng.random_range(1000..9999));
+                let session_id = format!("session_{}", rng.random_range(100000..999999));
+
                 let event = ClickEvent {
                     event_timestamp: Utc::now(),
                     session_id: session_id.clone(),
