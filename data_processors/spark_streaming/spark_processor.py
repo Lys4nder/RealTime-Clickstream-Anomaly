@@ -3,23 +3,18 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, window, count, when, current_timestamp
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
 
-# --- CONFIGURARE ---
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:29092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "clickstream_events")
 
-# Configurare MinIO
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 
-# Căi salvare date
-# NOTA: Am schimbat checkpoint_v2 ca sa evitam erorile de la testele anterioare
-CHECKPOINT_PATH = "s3a://lakehouse/checkpoints_v2/"
+CHECKPOINT_PATH = "s3a://lakehouse/checkpoints/"
 OUTPUT_PATH = "s3a://lakehouse/processed_data/"
 
 print("--- SPARK ANOMALY DETECTOR STARTED ---", flush=True)
 
-# Inițializare Sesiune Spark cu suport S3/MinIO
 spark = SparkSession.builder \
     .appName("ClickstreamAnomalyDetector") \
     .config("spark.sql.streaming.checkpointLocation", CHECKPOINT_PATH) \
@@ -33,7 +28,6 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Schema datelor (Trebuie să coincidă cu ce trimite Rust Producer)
 schema = StructType([
     StructField("event_timestamp", TimestampType(), True),
     StructField("session_id", StringType(), True),
@@ -48,7 +42,6 @@ schema = StructType([
     StructField("page_section", StringType(), True)
 ])
 
-# 1. Citire Stream din Kafka
 raw_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
@@ -57,13 +50,10 @@ raw_stream = spark.readStream \
     .option("failOnDataLoss", "false") \
     .load()
 
-# 2. Parsare JSON
 json_stream = raw_stream.selectExpr("CAST(value AS STRING) as json_value") \
     .select(from_json(col("json_value"), schema).alias("data")) \
     .select("data.*")
 
-# 3. Logica de Agregare (Anomalii)
-# Definim un watermark de 1 minut pentru a gestiona datele întârziate
 windowed_counts = json_stream \
     .withWatermark("event_timestamp", "1 minute") \
     .groupBy(
@@ -73,13 +63,10 @@ windowed_counts = json_stream \
     ) \
     .agg(count("*").alias("actions_count"))
 
-# 4. Flag Anomalie (Dacă userul face > 5 acțiuni pe minut)
 final_output = windowed_counts \
     .withColumn("is_anomaly", when(col("actions_count") > 5, True).otherwise(False)) \
     .withColumn("processed_at", current_timestamp())
 
-# 5. Scriere în MinIO (JSON)
-# OutputMode "append" va scrie rezultatul DOAR după ce trece fereastra de timp (Watermark)
 query = final_output.writeStream \
     .outputMode("append") \
     .format("json") \
