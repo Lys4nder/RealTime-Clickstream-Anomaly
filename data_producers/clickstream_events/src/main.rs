@@ -3,10 +3,10 @@ use rand::{rng, Rng};
 use serde::Serialize;
 use std::thread;
 use std::sync::Arc;
-mod handle_parquet;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseRecord, ThreadedProducer, DefaultProducerContext};
 use std::env;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Clone)]
 struct ClickEvent {
@@ -156,9 +156,9 @@ fn random_ip_address() -> String {
     )
 }
 
-fn random_sleep() {
+fn random_sleep(low: u64, high: u64) {
     let mut rng = rng();
-    let sleep_duration = rng.random_range(100..500);
+    let sleep_duration = rng.random_range(low..high);
     thread::sleep(std::time::Duration::from_millis(sleep_duration));
 }
 
@@ -185,38 +185,86 @@ fn generate(producer: Arc<ThreadedProducer<DefaultProducerContext>>, topic_name:
         let handle = thread::spawn(move || {
             let mut rng = rng();
             let mut click_sequence = 0u32;
-            let session_id = format!("session_{}", thread_id);
+            let session_id = Uuid::new_v4().to_string();
+            let is_suspicious = rng.random_range(1..=50) == 1;
             let user_id = format!("user_{}", rng.random_range(1000..9999));
 
             for _ in 0..max_events {
-                let event = ClickEvent {
-                    event_timestamp: Utc::now(),
-                    session_id: session_id.clone(),
-                    user_id: user_id.clone(),
-                    ip_address: random_ip_address(),
-                    country: random_value(&CountryCodes::VARIANTS),
-                    click_sequence,
-                    page_category: random_value(&PageCategory::VARIANTS),
-                    product_code: format!("PROD{}", rng.random_range(1000..9999)),
-                    action_type: random_value(&ActionType::VARIANTS),
-                    device_type: random_value(&DeviceType::VARIANTS),
-                    page_section: random_value(&PageSection::VARIANTS),
-                };
-
-                let json_string = serde_json::to_string(&event).unwrap();
-
-                if let Err((e, _)) = producer.send(
-                    BaseRecord::to(&topic)
-                        .payload(&json_string)
-                        .key(&user_id),
-                ) {
-                    eprintln!("Error sending message: {:?}", e);
+                click_sequence = rng.random_range(1..50);
+                
+                let (sleep_low, sleep_high) = if is_suspicious {
+                    (50u64, 100u64) 
                 } else {
-                    println!("Sent: {}", json_string);
-                }
+                    (500u64, 2000u64)
+                };
+                
+                if is_suspicious {
+                    let num_rapid_clicks = rng.random_range(5..=8);
+                    let suspicious_user_id = user_id.clone();
+                    let suspicious_ip = random_ip_address();
+                    let suspicious_country = random_value(&CountryCodes::VARIANTS);
+                    
+                    println!("Generating suspicious activity: {} rapid clicks for {}", num_rapid_clicks, suspicious_user_id);
+                    
+                    for _ in 0..num_rapid_clicks {
+                        let event = ClickEvent {
+                            event_timestamp: Utc::now(),
+                            session_id: session_id.clone(),
+                            user_id: suspicious_user_id.clone(),
+                            ip_address: suspicious_ip.clone(),
+                            country: suspicious_country.clone(),
+                            click_sequence,
+                            page_category: random_value(&PageCategory::VARIANTS),
+                            product_code: format!("PROD{}", rng.random_range(1000..9999)),
+                            action_type: random_value(&ActionType::VARIANTS),
+                            device_type: random_value(&DeviceType::VARIANTS),
+                            page_section: random_value(&PageSection::VARIANTS),
+                        };
 
-                click_sequence += 1;
-                random_sleep();
+                        let json_string = serde_json::to_string(&event).unwrap();
+
+                        if let Err((e, _)) = producer.send(
+                            BaseRecord::to(&topic)
+                                .payload(&json_string)
+                                .key(&suspicious_user_id),
+                        ) {
+                            eprintln!("Error sending message: {:?}", e);
+                        } else {
+                            println!("Sent: {}", json_string);
+                        }
+
+                        click_sequence += 1;
+                        random_sleep(sleep_low, sleep_high);
+                    }
+                } else {
+                    let event = ClickEvent {
+                        event_timestamp: Utc::now(),
+                        session_id: session_id.clone(),
+                        user_id: user_id.clone(),
+                        ip_address: random_ip_address(),
+                        country: random_value(&CountryCodes::VARIANTS),
+                        click_sequence: click_sequence,
+                        page_category: random_value(&PageCategory::VARIANTS),
+                        product_code: format!("PROD{}", rng.random_range(1000..9999)),
+                        action_type: random_value(&ActionType::VARIANTS),
+                        device_type: random_value(&DeviceType::VARIANTS),
+                        page_section: random_value(&PageSection::VARIANTS),
+                    };
+
+                    let json_string = serde_json::to_string(&event).unwrap();
+
+                    if let Err((e, _)) = producer.send(
+                        BaseRecord::to(&topic)
+                            .payload(&json_string)
+                            .key(&user_id),
+                    ) {
+                        eprintln!("Error sending message: {:?}", e);
+                    } else {
+                        println!("Sent: {}", json_string);
+                    }
+
+                    random_sleep(sleep_low, sleep_high);
+                }
             }
         });
 
