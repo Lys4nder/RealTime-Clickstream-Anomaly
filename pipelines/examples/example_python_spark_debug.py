@@ -40,8 +40,25 @@ if driver_bind:
 spark = builder.getOrCreate()
 
 
+try:
+    sc = spark.sparkContext
+    print("Configured SPARK_MASTER env var:", os.environ.get("SPARK_MASTER"))
+    print("SparkContext master:", sc.master)
+    print("Application ID:", sc.applicationId)
+    if sc.master and sc.master.startswith("local"):
+        print("NOTE: Spark is running in local mode.")
+    # Try to list executors registered
+    try:
+        jsc = sc._jsc.sc()
+        executor_status = jsc.getExecutorMemoryStatus().keySet().toArray()
+        print("Executor addresses:", list(executor_status))
+    except Exception as e:
+        print("Could not enumerate executors via JVM API:", e)
+except Exception as e:
+    print("Could not access SparkContext details:", e)
+
+
 def verify_with_batch_example(spark):
-    # Create a simple in-memory DataFrame to verify Spark is working
     data = [
         ("user1", "click", 1),
         ("user2", "view", 1),
@@ -55,7 +72,6 @@ def verify_with_batch_example(spark):
     print("== Sample DataFrame ==")
     df_sample.show(truncate=False)
 
-    # Simple aggregation: count events per user
     agg = (
         df_sample.groupBy("user_id")
         .sum("count")
