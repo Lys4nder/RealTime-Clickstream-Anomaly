@@ -5,7 +5,7 @@ import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 
 import { AppRoutingModule } from './app-routing-module';
 import { App } from './app';
-import { DataFetch } from './services/data-fetch';
+import { DataFetchService } from './services/data-fetch';
 import { Dashboard } from './components/dashboard/dashboard';
 
 @NgModule({
@@ -21,7 +21,7 @@ import { Dashboard } from './components/dashboard/dashboard';
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withInterceptorsFromDi()),
-    DataFetch
+    DataFetchService
   ],
   bootstrap: [App]
 })

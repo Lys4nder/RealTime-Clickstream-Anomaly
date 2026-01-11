@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { DataFetch, ClickEvent } from '../../services/data-fetch';
+import { DataFetchService, ClickEvent } from '../../services/data-fetch';
 import { interval, Subscription } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 
@@ -12,6 +12,7 @@ import { switchMap } from 'rxjs/operators';
 export class Dashboard implements OnInit, OnDestroy {
   clickEvents: ClickEvent[] = [];
   private subscription?: Subscription;
+  private initialSubscription?: Subscription;
   
   // Expose Object to template
   Object = Object;
@@ -25,28 +26,37 @@ export class Dashboard implements OnInit, OnDestroy {
   deviceTypeStats: { [key: string]: number } = {};
   countryStats: { [key: string]: number } = {};
 
-  constructor(private dataFetchService: DataFetch) {}
+  constructor(private dataFetchService: DataFetchService) {}
 
   ngOnInit(): void {
     this.loadData();
-    // Refresh data every 5 seconds
-    this.subscription = interval(5000)
-      .pipe(switchMap(() => this.dataFetchService.fetchClickEvents()))
-      .subscribe({
-        next: (events) => this.processEvents(events),
-        error: (err) => console.error('Error fetching events:', err)
-      });
   }
 
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
+    this.initialSubscription?.unsubscribe();
   }
 
   loadData(): void {
-    this.dataFetchService.fetchClickEvents().subscribe({
-      next: (events) => this.processEvents(events),
+    this.initialSubscription = this.dataFetchService.fetchClickEvents().subscribe({
+      next: (events) => {
+        this.processEvents(events);
+        this.startPolling();
+      },
       error: (err) => console.error('Error fetching events:', err)
     });
+  }
+
+  startPolling(): void {
+    // Only start polling if not already started
+    if (!this.subscription) {
+      this.subscription = interval(5000)
+        .pipe(switchMap(() => this.dataFetchService.fetchClickEvents()))
+        .subscribe({
+          next: (events) => this.processEvents(events),
+          error: (err) => console.error('Error fetching events:', err)
+        });
+    }
   }
 
   processEvents(events: ClickEvent[]): void {

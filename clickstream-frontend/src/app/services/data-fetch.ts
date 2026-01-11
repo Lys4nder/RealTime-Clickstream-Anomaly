@@ -1,6 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs/internal/Observable';
+import { Observable, throwError, timer } from 'rxjs';
+import { catchError, retry, retryWhen, mergeMap, finalize } from 'rxjs/operators';
 
 export interface ClickEvent {
   event_timestamp: string;
@@ -20,12 +21,87 @@ export interface ClickEvent {
 @Injectable({
   providedIn: 'root',
 })
-export class DataFetch {
+export class DataFetchService {
     private apiUrl = 'https://api.example.http://localhost:8080/api/click-events';
+    private maxRetries = 3;
+    private retryDelay = 1000; // 1 second
 
     constructor(private http: HttpClient) { }
 
     fetchClickEvents(): Observable<ClickEvent[]> {
-        return this.http.get<ClickEvent[]>(this.apiUrl);
+        return this.http.get<ClickEvent[]>(this.apiUrl).pipe(
+            retryWhen(errors =>
+                errors.pipe(
+                    mergeMap((error, index) => {
+                        if (index < this.maxRetries && this.shouldRetry(error)) {
+                            const delay = this.retryDelay * Math.pow(2, index);
+                            console.warn(`Retrying request (${index + 1}/${this.maxRetries}) after ${delay}ms...`);
+                            return timer(delay);
+                        }
+                        return throwError(() => error);
+                    })
+                )
+            ),
+            catchError((error) => this.handleError(error))
+        );
+    }
+
+    private shouldRetry(error: any): boolean {
+        if (error instanceof HttpErrorResponse) {
+            return error.status === 0 || (error.status >= 500 && error.status < 600);
+        }
+        return false;
+    }
+
+    private handleError(error: HttpErrorResponse): Observable<never> {
+        let errorMessage = 'An error occurred while fetching click events';
+
+        if (error.error instanceof ErrorEvent) {
+            errorMessage = `Network error: ${error.error.message}`;
+            console.error('Client-side error:', error.error.message);
+        } else {
+            // Backend returned an unsuccessful response code
+            switch (error.status) {
+                case 0:
+                    errorMessage = 'Unable to connect to the server. Please check your network connection.';
+                    break;
+                case 400:
+                    errorMessage = 'Bad request. The server could not understand the request.';
+                    break;
+                case 401:
+                    errorMessage = 'Unauthorized. Please check your credentials.';
+                    break;
+                case 403:
+                    errorMessage = 'Access forbidden. You do not have permission to access this resource.';
+                    break;
+                case 404:
+                    errorMessage = 'API endpoint not found. Please verify the server is running.';
+                    break;
+                case 408:
+                    errorMessage = 'Request timeout. The server took too long to respond.';
+                    break;
+                case 429:
+                    errorMessage = 'Too many requests. Please wait before trying again.';
+                    break;
+                case 500:
+                    errorMessage = 'Internal server error. Please try again later.';
+                    break;
+                case 502:
+                    errorMessage = 'Bad gateway. The server is temporarily unavailable.';
+                    break;
+                case 503:
+                    errorMessage = 'Service unavailable. The server is temporarily down.';
+                    break;
+                case 504:
+                    errorMessage = 'Gateway timeout. The server did not respond in time.';
+                    break;
+                default:
+                    errorMessage = `Server error (${error.status}): ${error.message}`;
+            }
+            console.error(`Backend error: Status ${error.status}, Message: ${error.message}`);
+        }
+
+        console.error('Error details:', errorMessage);
+        return throwError(() => new Error(errorMessage));
     }
 }
