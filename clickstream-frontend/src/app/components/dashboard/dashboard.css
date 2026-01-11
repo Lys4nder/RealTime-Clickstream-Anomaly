@@ -69,6 +69,10 @@
   background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
 }
 
+.stat-card.sales .stat-icon {
+  background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+}
+
 .stat-content {
   flex: 1;
 }
@@ -273,6 +277,83 @@
   font-weight: 600;
   color: #333;
   text-align: right;
+}
+
+/* Analytics Charts */
+.analytics-chart {
+  padding: 1.5rem;
+  min-height: 250px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.chart-bars.vertical {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  width: 100%;
+  height: 200px;
+  gap: 0.5rem;
+}
+
+.bar-item-vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 40px;
+}
+
+.bar-container-vertical {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar-fill-vertical {
+  width: 80%;
+  border-radius: 8px 8px 0 0;
+  transition: height 0.5s ease;
+  position: relative;
+}
+
+.bar-fill-vertical.sales {
+  background: linear-gradient(180deg, #f093fb 0%, #f5576c 100%);
+}
+
+.bar-fill-vertical.activity {
+  background: linear-gradient(180deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.bar-label-vertical {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  text-align: center;
+}
+
+.bar-value-small {
+  font-size: 0.7rem;
+  color: #999;
+  text-align: center;
+}
+
+.chart-bars.horizontal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: 100%;
+}
+
+.bar-fill.sales {
+  background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+}
+
+.bar-fill.activity {
+  background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
 }
 
 /* Events Section */

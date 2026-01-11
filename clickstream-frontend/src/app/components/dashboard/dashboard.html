@@ -31,12 +31,85 @@
         <span class="stat-percentage">{{ getPercentage(suspiciousCount) | number:'1.1-1' }}%</span>
       </div>
     </div>
+
+    <div class="stat-card sales">
+      <div class="stat-icon">💰</div>
+      <div class="stat-content">
+        <h3>Total Sales</h3>
+        <p class="stat-value">{{ formatCurrency(totalSales) }}</p>
+      </div>
+    </div>
   </div>
 
   <!-- Placeholder Graphs -->
   <div class="graphs-section">
     <h2 class="section-title">Analytics Overview</h2>
     <div class="graphs-grid">
+      <!-- Monthly Sales Graph -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Monthly Sales Trend</h3>
+          <span class="graph-badge">Batch Analytics</span>
+        </div>
+        <div class="analytics-chart">
+          <div class="chart-bars vertical">
+            <div class="bar-item-vertical" *ngFor="let item of monthlySpendData">
+              <div class="bar-container-vertical">
+                <div class="bar-fill-vertical sales" 
+                     [style.height.%]="(item.total_sales / getMaxValue(monthlySpendData, 'total_sales')) * 100"
+                     [title]="formatCurrency(item.total_sales)">
+                </div>
+              </div>
+              <span class="bar-label-vertical">{{ getMonthName(item.month) }}</span>
+              <span class="bar-value-small">{{ formatCurrency(item.total_sales) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hourly Activity Graph -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Peak Hours Activity</h3>
+          <span class="graph-badge warning">Peak: {{ peakHour }}:00</span>
+        </div>
+        <div class="analytics-chart">
+          <div class="chart-bars vertical">
+            <div class="bar-item-vertical" *ngFor="let item of hourlyActivityData.slice(0, 10)">
+              <div class="bar-container-vertical">
+                <div class="bar-fill-vertical activity" 
+                     [style.height.%]="(item.count / getMaxValue(hourlyActivityData, 'count')) * 100"
+                     [title]="item.count + ' orders'">
+                </div>
+              </div>
+              <span class="bar-label-vertical">{{ item.hour }}h</span>
+              <span class="bar-value-small">{{ item.count }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Country Orders Distribution -->
+      <div class="graph-card wide">
+        <div class="graph-header">
+          <h3>Top Countries by Orders (Q1)</h3>
+          <span class="graph-badge info">Top: {{ topCountry }}</span>
+        </div>
+        <div class="analytics-chart">
+          <div class="chart-bars horizontal">
+            <div class="bar-item" *ngFor="let item of countryOrdersData.slice(0, 8)">
+              <span class="bar-label">{{ item.shipping_country }}</span>
+              <div class="bar-container">
+                <div class="bar-fill country" 
+                     [style.width.%]="(item.count / getMaxValue(countryOrdersData, 'count')) * 100">
+                </div>
+              </div>
+              <span class="bar-value">{{ item.count }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Real-time Events Graph -->
       <div class="graph-card">
         <div class="graph-header">
@@ -51,63 +124,6 @@
             </svg>
             <p>Time Series Graph</p>
             <span class="placeholder-label">Events over time</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Anomaly Detection Graph -->
-      <div class="graph-card">
-        <div class="graph-header">
-          <h3>Anomaly Detection Rate</h3>
-          <span class="graph-badge warning">Monitoring</span>
-        </div>
-        <div class="graph-placeholder">
-          <div class="placeholder-content">
-            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M18 20V10"></path>
-              <path d="M12 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-            <p>Bar Chart</p>
-            <span class="placeholder-label">Suspicious vs Normal</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Geographic Distribution -->
-      <div class="graph-card wide">
-        <div class="graph-header">
-          <h3>Geographic Distribution</h3>
-          <span class="graph-badge info">{{ Object.keys(countryStats).length }} Countries</span>
-        </div>
-        <div class="graph-placeholder">
-          <div class="placeholder-content">
-            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M2 12h20"></path>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-            </svg>
-            <p>World Map</p>
-            <span class="placeholder-label">Event distribution by location</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- User Behavior Pattern -->
-      <div class="graph-card">
-        <div class="graph-header">
-          <h3>User Behavior Patterns</h3>
-          <span class="graph-badge">Analysis</span>
-        </div>
-        <div class="graph-placeholder">
-          <div class="placeholder-content">
-            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 8v8"></path>
-              <path d="M8 12h8"></path>
-            </svg>
-            <p>Scatter Plot</p>
-            <span class="placeholder-label">Click sequences & patterns</span>
           </div>
         </div>
       </div>

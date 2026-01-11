@@ -18,11 +18,27 @@ export interface ClickEvent {
   isSuspicious: boolean;
 }
 
+export interface MonthlySpend {
+  month: number;
+  total_sales: number;
+}
+
+export interface CountryOrders {
+  shipping_country: string;
+  count: number;
+}
+
+export interface HourlyActivity {
+  hour: number;
+  count: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
 export class DataFetchService {
     private apiUrl = 'https://api.example.http://localhost:8080/api/click-events';
+    private analyticsUrl = 'http://localhost:8080/api/analytics';
     private maxRetries = 3;
     private retryDelay = 1000; // 1 second
 
@@ -36,6 +52,57 @@ export class DataFetchService {
                         if (index < this.maxRetries && this.shouldRetry(error)) {
                             const delay = this.retryDelay * Math.pow(2, index);
                             console.warn(`Retrying request (${index + 1}/${this.maxRetries}) after ${delay}ms...`);
+                            return timer(delay);
+                        }
+                        return throwError(() => error);
+                    })
+                )
+            ),
+            catchError((error) => this.handleError(error))
+        );
+    }
+
+    fetchMonthlySpend(): Observable<MonthlySpend[]> {
+        return this.http.get<MonthlySpend[]>(`${this.analyticsUrl}/monthly-spend`).pipe(
+            retryWhen(errors =>
+                errors.pipe(
+                    mergeMap((error, index) => {
+                        if (index < this.maxRetries && this.shouldRetry(error)) {
+                            const delay = this.retryDelay * Math.pow(2, index);
+                            return timer(delay);
+                        }
+                        return throwError(() => error);
+                    })
+                )
+            ),
+            catchError((error) => this.handleError(error))
+        );
+    }
+
+    fetchCountryOrders(): Observable<CountryOrders[]> {
+        return this.http.get<CountryOrders[]>(`${this.analyticsUrl}/country-orders`).pipe(
+            retryWhen(errors =>
+                errors.pipe(
+                    mergeMap((error, index) => {
+                        if (index < this.maxRetries && this.shouldRetry(error)) {
+                            const delay = this.retryDelay * Math.pow(2, index);
+                            return timer(delay);
+                        }
+                        return throwError(() => error);
+                    })
+                )
+            ),
+            catchError((error) => this.handleError(error))
+        );
+    }
+
+    fetchHourlyActivity(): Observable<HourlyActivity[]> {
+        return this.http.get<HourlyActivity[]>(`${this.analyticsUrl}/hourly-activity`).pipe(
+            retryWhen(errors =>
+                errors.pipe(
+                    mergeMap((error, index) => {
+                        if (index < this.maxRetries && this.shouldRetry(error)) {
+                            const delay = this.retryDelay * Math.pow(2, index);
                             return timer(delay);
                         }
                         return throwError(() => error);
