@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 
 
-def get_spark_session(app_name="MyApp") -> SparkSession:
+def get_spark_session(app_name="MyApp", cores="2") -> SparkSession:
     # Load repo-local envs first so user environment variables can still override
     load_dotenv()
 
@@ -38,6 +38,7 @@ def get_spark_session(app_name="MyApp") -> SparkSession:
         .config("spark.hadoop.fs.s3a.connection.ssl.enabled", s3_ssl)
         .config("spark.jars.packages", ",".join(spark_packages))
         .config("spark.sql.legacy.parquet.nanosAsLong", "true")
+        .config("spark.cores.max", cores)
     )
 
     # Master and driver settings from env

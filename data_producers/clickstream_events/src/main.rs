@@ -330,6 +330,29 @@ fn generate(producer: Arc<ThreadedProducer<DefaultProducerContext>>, topic_name:
     }
 }
 
+// fn main() {
+//     env_logger::init();
+
+//     // Read Env Vars
+//     let broker = env::var("KAFKA_BROKER").unwrap_or_else(|_| "localhost:9092".to_string());
+//     let topic = env::var("KAFKA_TOPIC").expect("KAFKA_TOPIC must be set");
+//     let max_events = env::var("MAX_EVENTS")
+//         .unwrap_or_else(|_| "1000".to_string())
+//         .parse::<usize>()
+//         .unwrap_or(1000);
+
+//     println!("Connecting to Kafka at: {}", broker);
+//     println!("Max events per thread: {}", max_events);
+
+//     let producer: ThreadedProducer<DefaultProducerContext> = ClientConfig::new()
+//         .set("bootstrap.servers", &broker)
+//         .set("message.timeout.ms", "5000")
+//         .create()
+//         .expect("Producer creation error");
+
+//     let producer = Arc::new(producer);
+//     generate(producer, topic, max_events);
+// }
 fn main() {
     env_logger::init();
 
@@ -342,7 +365,7 @@ fn main() {
         .unwrap_or(1000);
 
     println!("Connecting to Kafka at: {}", broker);
-    println!("Max events per thread: {}", max_events);
+    println!("Max events per user session: {}", max_events);
 
     let producer: ThreadedProducer<DefaultProducerContext> = ClientConfig::new()
         .set("bootstrap.servers", &broker)
@@ -351,5 +374,17 @@ fn main() {
         .expect("Producer creation error");
 
     let producer = Arc::new(producer);
-    generate(producer, topic, max_events);
+
+    println!("Starting continuous traffic generation...");
+    loop {
+        generate(
+            Arc::clone(&producer), 
+            topic.clone(), 
+            max_events
+        );
+        
+        println!("Batch finished. Starting new batch of sessions...");
+        
+        thread::sleep(std::time::Duration::from_millis(100));
+    }
 }

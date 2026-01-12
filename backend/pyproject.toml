@@ -5,9 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiokafka>=0.13.0",
     "deltalake>=1.3.1",
     "duckdb>=1.4.3",
     "fastapi>=0.128.0",
     "pandas>=2.3.3",
-    "uvicorn>=0.40.0",
+    "uvicorn[standard]>=0.40.0",
 ]
