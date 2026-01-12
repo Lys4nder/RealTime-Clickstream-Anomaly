@@ -6,37 +6,35 @@
 
   <!-- Stats Cards -->
   <div class="stats-grid">
-    <div class="stat-card total">
-      <div class="stat-icon">📊</div>
-      <div class="stat-content">
-        <h3>Total Events</h3>
-        <p class="stat-value">{{ totalEvents }}</p>
-      </div>
-    </div>
-    
-    <div class="stat-card normal">
-      <div class="stat-icon">✓</div>
-      <div class="stat-content">
-        <h3>Normal Events</h3>
-        <p class="stat-value">{{ normalCount }}</p>
-        <span class="stat-percentage">{{ getPercentage(normalCount) | number:'1.1-1' }}%</span>
-      </div>
-    </div>
-    
-    <div class="stat-card suspicious">
-      <div class="stat-icon">⚠</div>
-      <div class="stat-content">
-        <h3>Suspicious Events</h3>
-        <p class="stat-value">{{ suspiciousCount }}</p>
-        <span class="stat-percentage">{{ getPercentage(suspiciousCount) | number:'1.1-1' }}%</span>
-      </div>
-    </div>
-
     <div class="stat-card sales">
       <div class="stat-icon">💰</div>
       <div class="stat-content">
         <h3>Total Sales</h3>
         <p class="stat-value">{{ formatCurrency(totalSales) }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card info">
+      <div class="stat-icon">🌍</div>
+      <div class="stat-content">
+        <h3>Top Country</h3>
+        <p class="stat-value">{{ topCountry || 'N/A' }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card warning">
+      <div class="stat-icon">⏰</div>
+      <div class="stat-content">
+        <h3>Peak Hour</h3>
+        <p class="stat-value">{{ peakHour }}:00</p>
+      </div>
+    </div>
+
+    <div class="stat-card total">
+      <div class="stat-icon">📈</div>
+      <div class="stat-content">
+        <h3>Countries</h3>
+        <p class="stat-value">{{ countryOrdersData.length }}</p>
       </div>
     </div>
   </div>
@@ -56,7 +54,7 @@
             <div class="bar-item-vertical" *ngFor="let item of monthlySpendData">
               <div class="bar-container-vertical">
                 <div class="bar-fill-vertical sales" 
-                     [style.height.%]="(item.total_sales / getMaxValue(monthlySpendData, 'total_sales')) * 100"
+                     [style.height.%]="getBarHeight(item.total_sales, monthlySpendData, 'total_sales')"
                      [title]="formatCurrency(item.total_sales)">
                 </div>
               </div>
@@ -75,10 +73,10 @@
         </div>
         <div class="analytics-chart">
           <div class="chart-bars vertical">
-            <div class="bar-item-vertical" *ngFor="let item of hourlyActivityData.slice(0, 10)">
+            <div class="bar-item-vertical" *ngFor="let item of hourlyActivityData">
               <div class="bar-container-vertical">
                 <div class="bar-fill-vertical activity" 
-                     [style.height.%]="(item.count / getMaxValue(hourlyActivityData, 'count')) * 100"
+                     [style.height.%]="getBarHeight(item.count, hourlyActivityData, 'count')"
                      [title]="item.count + ' orders'">
                 </div>
               </div>
@@ -108,130 +106,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Real-time Events Graph -->
-      <div class="graph-card">
-        <div class="graph-header">
-          <h3>Real-time Event Stream</h3>
-          <span class="graph-badge">Live</span>
-        </div>
-        <div class="graph-placeholder">
-          <div class="placeholder-content">
-            <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <polyline points="3 12 9 6 13 10 21 2"></polyline>
-              <path d="M21 2v6h-6"></path>
-            </svg>
-            <p>Time Series Graph</p>
-            <span class="placeholder-label">Events over time</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Charts Section -->
-  <div class="charts-grid">
-    <div class="chart-card">
-      <h3>Events by Category</h3>
-      <div class="chart-bars">
-        <div class="bar-item" *ngFor="let entry of getObjectEntries(categoryStats)">
-          <span class="bar-label">{{ entry[0] }}</span>
-          <div class="bar-container">
-            <div class="bar-fill" [style.width.%]="getPercentage(entry[1])"></div>
-          </div>
-          <span class="bar-value">{{ entry[1] }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <h3>Action Types</h3>
-      <div class="chart-bars">
-        <div class="bar-item" *ngFor="let entry of getObjectEntries(actionTypeStats)">
-          <span class="bar-label">{{ entry[0] }}</span>
-          <div class="bar-container">
-            <div class="bar-fill action" [style.width.%]="getPercentage(entry[1])"></div>
-          </div>
-          <span class="bar-value">{{ entry[1] }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <h3>Device Types</h3>
-      <div class="chart-bars">
-        <div class="bar-item" *ngFor="let entry of getObjectEntries(deviceTypeStats)">
-          <span class="bar-label">{{ entry[0] }}</span>
-          <div class="bar-container">
-            <div class="bar-fill device" [style.width.%]="getPercentage(entry[1])"></div>
-          </div>
-          <span class="bar-value">{{ entry[1] }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="chart-card">
-      <h3>Countries</h3>
-      <div class="chart-bars">
-        <div class="bar-item" *ngFor="let entry of getObjectEntries(countryStats)">
-          <span class="bar-label">{{ entry[0] }}</span>
-          <div class="bar-container">
-            <div class="bar-fill country" [style.width.%]="getPercentage(entry[1])"></div>
-          </div>
-          <span class="bar-value">{{ entry[1] }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live Events List -->
-  <div class="events-section">
-    <div class="section-header">
-      <h2 class="section-title">Live Event Stream</h2>
-      <div class="event-counter">
-        <span class="pulse-dot"></span>
-        <span>{{ clickEvents.length }} events</span>
-      </div>
-    </div>
-    <div class="events-table-container">
-      <table class="events-table">
-        <thead>
-          <tr>
-            <th>Status</th>
-            <th>Timestamp</th>
-            <th>Session ID</th>
-            <th>User ID</th>
-            <th>IP Address</th>
-            <th>Country</th>
-            <th>Category</th>
-            <th>Action</th>
-            <th>Device</th>
-            <th>Sequence</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let event of clickEvents" 
-              [class.suspicious-row]="event.isSuspicious">
-            <td>
-              <span class="status-badge" [class.status-suspicious]="event.isSuspicious">
-                {{ event.isSuspicious ? '⚠ SUSPICIOUS' : '✓ Normal' }}
-              </span>
-            </td>
-            <td class="timestamp">{{ formatTimestamp(event.event_timestamp) }}</td>
-            <td>{{ event.session_id }}</td>
-            <td>{{ event.user_id }}</td>
-            <td class="monospace">{{ event.ip_address }}</td>
-            <td>{{ event.country }}</td>
-            <td>{{ event.page_category }}</td>
-            <td>{{ event.action_type }}</td>
-            <td>{{ event.device_type }}</td>
-            <td class="text-center">{{ event.click_sequence }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div *ngIf="clickEvents.length === 0" class="no-data">
-        <p>No events to display. Waiting for data...</p>
       </div>
     </div>
   </div>

@@ -1,22 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, throwError, timer } from 'rxjs';
-import { catchError, retry, retryWhen, mergeMap, finalize } from 'rxjs/operators';
-
-export interface ClickEvent {
-  event_timestamp: string;
-  session_id: string;
-  user_id: string;
-  ip_address: string;
-  country: string;
-  click_sequence: number;
-  page_category: string;
-  product_code: string;
-  action_type: string;
-  device_type: string;
-  page_section: string;
-  isSuspicious: boolean;
-}
+import { catchError, retryWhen, mergeMap } from 'rxjs/operators';
+import { environment } from '../../environments/environment';
 
 export interface MonthlySpend {
   month: number;
@@ -37,33 +23,14 @@ export interface HourlyActivity {
   providedIn: 'root',
 })
 export class DataFetchService {
-    private apiUrl = 'https://api.example.http://localhost:8080/api/click-events';
-    private analyticsUrl = 'http://localhost:8080/api/analytics';
+    private apiUrl = environment.apiUrl;
     private maxRetries = 3;
     private retryDelay = 1000; // 1 second
 
     constructor(private http: HttpClient) { }
 
-    fetchClickEvents(): Observable<ClickEvent[]> {
-        return this.http.get<ClickEvent[]>(this.apiUrl).pipe(
-            retryWhen(errors =>
-                errors.pipe(
-                    mergeMap((error, index) => {
-                        if (index < this.maxRetries && this.shouldRetry(error)) {
-                            const delay = this.retryDelay * Math.pow(2, index);
-                            console.warn(`Retrying request (${index + 1}/${this.maxRetries}) after ${delay}ms...`);
-                            return timer(delay);
-                        }
-                        return throwError(() => error);
-                    })
-                )
-            ),
-            catchError((error) => this.handleError(error))
-        );
-    }
-
     fetchMonthlySpend(): Observable<MonthlySpend[]> {
-        return this.http.get<MonthlySpend[]>(`${this.analyticsUrl}/monthly-spend`).pipe(
+        return this.http.get<MonthlySpend[]>(`${this.apiUrl}/monthly-sales`).pipe(
             retryWhen(errors =>
                 errors.pipe(
                     mergeMap((error, index) => {
@@ -80,7 +47,7 @@ export class DataFetchService {
     }
 
     fetchCountryOrders(): Observable<CountryOrders[]> {
-        return this.http.get<CountryOrders[]>(`${this.analyticsUrl}/country-orders`).pipe(
+        return this.http.get<CountryOrders[]>(`${this.apiUrl}/country-stats`).pipe(
             retryWhen(errors =>
                 errors.pipe(
                     mergeMap((error, index) => {
@@ -97,7 +64,7 @@ export class DataFetchService {
     }
 
     fetchHourlyActivity(): Observable<HourlyActivity[]> {
-        return this.http.get<HourlyActivity[]>(`${this.analyticsUrl}/hourly-activity`).pipe(
+        return this.http.get<HourlyActivity[]>(`${this.apiUrl}/hourly-peaks`).pipe(
             retryWhen(errors =>
                 errors.pipe(
                     mergeMap((error, index) => {
