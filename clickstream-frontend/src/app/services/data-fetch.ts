@@ -24,59 +24,43 @@ export interface HourlyActivity {
 })
 export class DataFetchService {
     private apiUrl = environment.apiUrl;
-    private maxRetries = 3;
+    private maxAttempts = 3; 
     private retryDelay = 1000; // 1 second
 
     constructor(private http: HttpClient) { }
 
+    private retryWithBackoff<T>() {
+        return retryWhen<T>(errors =>
+            errors.pipe(
+                mergeMap((error, index) => {
+                    if (index < this.maxAttempts - 1 && this.shouldRetry(error)) {
+                        const delay = this.retryDelay * Math.pow(2, index);
+                        return timer(delay);
+                    }
+                    return throwError(() => error);
+                })
+            )
+        );
+    }
+
     fetchMonthlySpend(): Observable<MonthlySpend[]> {
         return this.http.get<MonthlySpend[]>(`${this.apiUrl}/monthly-sales`).pipe(
-            retryWhen(errors =>
-                errors.pipe(
-                    mergeMap((error, index) => {
-                        if (index < this.maxRetries && this.shouldRetry(error)) {
-                            const delay = this.retryDelay * Math.pow(2, index);
-                            return timer(delay);
-                        }
-                        return throwError(() => error);
-                    })
-                )
-            ),
-            catchError((error) => this.handleError(error))
+            this.retryWithBackoff(),
+            catchError((error) => this.handleError(error, 'monthly sales data'))
         );
     }
 
     fetchCountryOrders(): Observable<CountryOrders[]> {
         return this.http.get<CountryOrders[]>(`${this.apiUrl}/country-stats`).pipe(
-            retryWhen(errors =>
-                errors.pipe(
-                    mergeMap((error, index) => {
-                        if (index < this.maxRetries && this.shouldRetry(error)) {
-                            const delay = this.retryDelay * Math.pow(2, index);
-                            return timer(delay);
-                        }
-                        return throwError(() => error);
-                    })
-                )
-            ),
-            catchError((error) => this.handleError(error))
+            this.retryWithBackoff(),
+            catchError((error) => this.handleError(error, 'country statistics'))
         );
     }
 
     fetchHourlyActivity(): Observable<HourlyActivity[]> {
         return this.http.get<HourlyActivity[]>(`${this.apiUrl}/hourly-peaks`).pipe(
-            retryWhen(errors =>
-                errors.pipe(
-                    mergeMap((error, index) => {
-                        if (index < this.maxRetries && this.shouldRetry(error)) {
-                            const delay = this.retryDelay * Math.pow(2, index);
-                            return timer(delay);
-                        }
-                        return throwError(() => error);
-                    })
-                )
-            ),
-            catchError((error) => this.handleError(error))
+            this.retryWithBackoff(),
+            catchError((error) => this.handleError(error, 'hourly activity data'))
         );
     }
 
@@ -87,8 +71,8 @@ export class DataFetchService {
         return false;
     }
 
-    private handleError(error: HttpErrorResponse): Observable<never> {
-        let errorMessage = 'An error occurred while fetching click events';
+    private handleError(error: HttpErrorResponse, dataType: string = 'data'): Observable<never> {
+        let errorMessage = `An error occurred while fetching ${dataType}`;
 
         if (error.error instanceof ErrorEvent) {
             errorMessage = `Network error: ${error.error.message}`;

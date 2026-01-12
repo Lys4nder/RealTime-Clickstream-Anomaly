@@ -22,9 +22,6 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   private monthlySalesChart?: Chart;
   private hourlyActivityChart?: Chart;
   private countryOrdersChart?: Chart;
-  
-  // Expose Object to template
-  Object = Object;
 
   monthlySpendData: MonthlySpend[] = [];
   countryOrdersData: CountryOrders[] = [];
@@ -147,7 +144,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
         },
         scales: {
           y: {
-            beginAtZero: false,
+            beginAtZero: true,
             ticks: {
               callback: (value) => this.formatCurrency(Number(value))
             }
@@ -188,7 +185,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
         },
         scales: {
           y: {
-            beginAtZero: false
+            beginAtZero: true
           }
         }
       }
@@ -246,29 +243,5 @@ createCountryOrdersChart(): void {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
-  }
-
-  getMaxValue(data: any[], key: string): number {
-    if (data.length === 0) return 1;
-    return Math.max(...data.map(item => item[key]));
-  }
-
-  getMinValue(data: any[], key: string): number {
-    if (data.length === 0) return 0;
-    return Math.min(...data.map(item => item[key]));
-  }
-
-  getBarHeight(value: number, data: any[], key: string): number {
-    if (data.length === 0) return 0;
-    const min = this.getMinValue(data, key);
-    const max = this.getMaxValue(data, key);
-    const range = max - min;
-    
-    // If all values are the same, return full height
-    if (range === 0) return 100;
-    
-    // Calculate percentage from min to max with 10% padding at bottom
-    const percentage = ((value - min) / range) * 90 + 10;
-    return percentage;
   }
 }
