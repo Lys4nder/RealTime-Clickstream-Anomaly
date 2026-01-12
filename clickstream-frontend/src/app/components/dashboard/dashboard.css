@@ -283,79 +283,16 @@
 .analytics-chart {
   padding: 1.5rem;
   min-height: 280px;
+  height: 280px;
   display: flex;
-  align-items: flex-end;
-  width: 100%;
-  overflow-x: auto;
-  position: relative;
-  background: 
-    linear-gradient(to top, #e0e0e0 1px, transparent 1px),
-    linear-gradient(to top, #f5f5f5 1px, transparent 1px);
-  background-size: 100% 25%, 100% 12.5%;
-  background-position: bottom;
-}
-
-.chart-bars.vertical {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 220px;
-  gap: 0.5rem;
-  position: relative;
-  z-index: 1;
-}
-
-.bar-item-vertical {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.3rem;
-  flex: 0 0 auto;
-  width: 35px;
-  height: 100%;
-}
-
-.bar-container-vertical {
   width: 100%;
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  min-height: 150px;
-}
-
-.bar-fill-vertical {
-  width: 85%;
-  min-height: 5px;
-  border-radius: 8px 8px 0 0;
-  transition: height 0.5s ease;
   position: relative;
 }
 
-.bar-fill-vertical.sales {
-  background: linear-gradient(180deg, #f093fb 0%, #f5576c 100%);
-  box-shadow: 0 -2px 8px rgba(245, 87, 108, 0.3);
-}
-
-.bar-fill-vertical.activity {
-  background: linear-gradient(180deg, #4facfe 0%, #00f2fe 100%);
-  box-shadow: 0 -2px 8px rgba(79, 172, 254, 0.3);
-}
-
-.bar-label-vertical {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #666;
-  text-align: center;
-}
-
-.bar-value-small {
-  font-size: 0.7rem;
-  color: #999;
-  text-align: center;
+.analytics-chart canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .chart-bars.horizontal {

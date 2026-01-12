@@ -50,18 +50,7 @@
           <span class="graph-badge">Batch Analytics</span>
         </div>
         <div class="analytics-chart">
-          <div class="chart-bars vertical">
-            <div class="bar-item-vertical" *ngFor="let item of monthlySpendData">
-              <div class="bar-container-vertical">
-                <div class="bar-fill-vertical sales" 
-                     [style.height.%]="getBarHeight(item.total_sales, monthlySpendData, 'total_sales')"
-                     [title]="formatCurrency(item.total_sales)">
-                </div>
-              </div>
-              <span class="bar-label-vertical">{{ getMonthName(item.month) }}</span>
-              <span class="bar-value-small">{{ formatCurrency(item.total_sales) }}</span>
-            </div>
-          </div>
+          <canvas #monthlySalesChart></canvas>
         </div>
       </div>
 
@@ -72,18 +61,7 @@
           <span class="graph-badge warning">Peak: {{ peakHour }}:00</span>
         </div>
         <div class="analytics-chart">
-          <div class="chart-bars vertical">
-            <div class="bar-item-vertical" *ngFor="let item of hourlyActivityData">
-              <div class="bar-container-vertical">
-                <div class="bar-fill-vertical activity" 
-                     [style.height.%]="getBarHeight(item.count, hourlyActivityData, 'count')"
-                     [title]="item.count + ' orders'">
-                </div>
-              </div>
-              <span class="bar-label-vertical">{{ item.hour }}h</span>
-              <span class="bar-value-small">{{ item.count }}</span>
-            </div>
-          </div>
+          <canvas #hourlyActivityChart></canvas>
         </div>
       </div>
 
