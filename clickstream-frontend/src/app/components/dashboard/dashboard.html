@@ -1,0 +1,80 @@
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <h1>Clickstream Analytics Dashboard</h1>
+    <p class="subtitle">Real-time monitoring and anomaly detection</p>
+  </header>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card sales">
+      <div class="stat-icon">💰</div>
+      <div class="stat-content">
+        <h3>Total Sales</h3>
+        <p class="stat-value">{{ formatCurrency(totalSales) }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card info">
+      <div class="stat-icon">🌍</div>
+      <div class="stat-content">
+        <h3>Top Country</h3>
+        <p class="stat-value">{{ topCountry || 'N/A' }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card warning">
+      <div class="stat-icon">⏰</div>
+      <div class="stat-content">
+        <h3>Peak Hour</h3>
+        <p class="stat-value">{{ peakHour }}:00</p>
+      </div>
+    </div>
+
+    <div class="stat-card total">
+      <div class="stat-icon">📈</div>
+      <div class="stat-content">
+        <h3>Countries</h3>
+        <p class="stat-value">{{ countryOrdersData.length }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Placeholder Graphs -->
+  <div class="graphs-section">
+    <h2 class="section-title">Analytics Overview</h2>
+    <div class="graphs-grid">
+      <!-- Monthly Sales Graph -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Monthly Sales Trend</h3>
+          <span class="graph-badge">Batch Analytics</span>
+        </div>
+        <div class="analytics-chart">
+          <canvas #monthlySalesChart></canvas>
+        </div>
+      </div>
+
+      <!-- Hourly Activity Graph -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Peak Hours Activity</h3>
+          <span class="graph-badge warning">Peak: {{ peakHour }}:00</span>
+        </div>
+        <div class="analytics-chart">
+          <canvas #hourlyActivityChart></canvas>
+        </div>
+      </div>
+
+      <!-- Country Orders Distribution -->
+      <div class="graph-card wide">
+        <div class="graph-header">
+          <h3>Top Countries by Orders</h3>
+          <span class="graph-badge info">Top: {{ topCountry }}</span>
+        </div>
+        <div class="analytics-chart country-chart">
+          <canvas #countryOrdersChart></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
