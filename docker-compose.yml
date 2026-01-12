@@ -135,7 +135,9 @@ services:
       - NUM_THREADS=1
       - RUST_LOG=info
       - MAX_EVENTS=1000
-
+    
+    networks:
+      - app-tier
 
 # 5. Init Job: Create MinIO Buckets automatically
 
@@ -152,7 +154,6 @@ services:
     command: -c "sh /usr/bin/init_minio.sh && sh /usr/bin/upload_parquet_to_bucket.sh /tmp/Orders_Transaction_History.parquet parquet-uploads Orders_Transaction_History.parquet"
     networks:
       - app-tier
-
 
 # 6. Backend
   backend-api:

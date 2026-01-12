@@ -303,7 +303,6 @@ fn generate(producer: Arc<ThreadedProducer<DefaultProducerContext>>, topic_name:
                     }
                     _ => format!("PROD{}", rng.random_range(1000..9999)),
                 };
-
                 let event = ClickEvent {
                     event_timestamp: Utc::now(),
                     session_id: session_id.clone(),
