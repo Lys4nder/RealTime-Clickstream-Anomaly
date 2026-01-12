@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { DataFetchService, MonthlySpend, CountryOrders, HourlyActivity } from '../../services/data-fetch';
-import { Subscription, forkJoin } from 'rxjs';
+import { Subscription, forkJoin, interval } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 
 Chart.register(...registerables);
@@ -17,6 +18,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('countryOrdersChart') countryOrdersCanvas!: ElementRef<HTMLCanvasElement>;
 
   private analyticsSubscription?: Subscription;
+  private pollingSubscription?: Subscription;
   private monthlySalesChart?: Chart;
   private hourlyActivityChart?: Chart;
   private countryOrdersChart?: Chart;
@@ -36,6 +38,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit(): void {
     this.loadAnalytics();
+    this.startPolling();
   }
 
   ngAfterViewInit(): void {
@@ -44,9 +47,32 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy(): void {
     this.analyticsSubscription?.unsubscribe();
+    this.pollingSubscription?.unsubscribe();
     this.monthlySalesChart?.destroy();
     this.hourlyActivityChart?.destroy();
     this.countryOrdersChart?.destroy();
+  }
+
+  startPolling(): void {
+    // Poll every 5 minutes
+    this.pollingSubscription = interval(1000 * 60 * 5)
+      .pipe(
+        switchMap(() => forkJoin({
+          monthlySpend: this.dataFetchService.fetchMonthlySpend(),
+          countryOrders: this.dataFetchService.fetchCountryOrders(),
+          hourlyActivity: this.dataFetchService.fetchHourlyActivity()
+        }))
+      )
+      .subscribe({
+        next: (data) => {
+          console.log('Data refreshed at:', new Date().toLocaleTimeString());
+          this.monthlySpendData = data.monthlySpend;
+          this.countryOrdersData = data.countryOrders;
+          this.hourlyActivityData = data.hourlyActivity;
+          this.processAnalytics();
+        },
+        error: (err) => console.error('Error polling analytics:', err)
+      });
   }
 
   loadAnalytics(): void {
@@ -87,7 +113,10 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
 
   createMonthlySalesChart(): void {
     if (this.monthlySalesChart) {
-      this.monthlySalesChart.destroy();
+      this.monthlySalesChart.data.labels = this.monthlySpendData.map(item => this.getMonthName(item.month));
+      this.monthlySalesChart.data.datasets[0].data = this.monthlySpendData.map(item => item.total_sales);
+      this.monthlySalesChart.update();
+      return;
     }
 
     const ctx = this.monthlySalesCanvas.nativeElement.getContext('2d');
@@ -130,7 +159,10 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
 
   createHourlyActivityChart(): void {
     if (this.hourlyActivityChart) {
-      this.hourlyActivityChart.destroy();
+      this.hourlyActivityChart.data.labels = this.hourlyActivityData.map(item => item.hour + 'h');
+      this.hourlyActivityChart.data.datasets[0].data = this.hourlyActivityData.map(item => item.count);
+      this.hourlyActivityChart.update();
+      return;
     }
 
     const ctx = this.hourlyActivityCanvas.nativeElement.getContext('2d');
@@ -164,7 +196,10 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   }
 createCountryOrdersChart(): void {
     if (this.countryOrdersChart) {
-      this.countryOrdersChart.destroy();
+      this.countryOrdersChart.data.labels = this.countryOrdersData.map(item => item.shipping_country);
+      this.countryOrdersChart.data.datasets[0].data = this.countryOrdersData.map(item => item.count);
+      this.countryOrdersChart.update();
+      return;
     }
 
     const ctx = this.countryOrdersCanvas.nativeElement.getContext('2d');
