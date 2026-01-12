@@ -155,27 +155,6 @@ services:
     networks:
       - app-tier
 
-  # 6. Spark Processor Job: Real-time Data Processor
-  spark-processor:
-    build:
-      context: ./data_processors/spark_streaming
-      dockerfile: Dockerfile
-    container_name: spark_processor
-    depends_on:
-      - kafka
-      - minio
-      - minio-init
-    environment:
-      - PYTHONUNBUFFERED=1
-      - KAFKA_BROKER=kafka:29092
-      - KAFKA_TOPIC=clickstream_events
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-    networks:
-      - app-tier
-
-
 # 6. Backend
   backend-api:
     build:

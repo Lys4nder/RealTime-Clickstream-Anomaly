@@ -22,10 +22,13 @@ OUTPUT_PATH_TRENDING = "s3a://lakehouse/trending_pages/"
 CHECKPOINT_PATH_SESSIONS = "s3a://lakehouse/checkpoints_sessions/"
 OUTPUT_PATH_SESSIONS = "s3a://lakehouse/session_stats/"
 
-print("--- SPARK MULTI-STREAM PIPELINE STARTED ---", flush=True)
+print("--- SPARK MULTI-STREAM PIPELINE STARTED (DELTA LAKE) ---", flush=True)
 
 spark = SparkSession.builder \
     .appName("ClickstreamAnalytics") \
+    .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.0.0,org.apache.hadoop:hadoop-aws:3.3.4") \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
     .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT) \
     .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY) \
     .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY) \
@@ -76,13 +79,13 @@ anomaly_df = json_stream \
 
 query_anomaly = anomaly_df.writeStream \
     .outputMode("append") \
-    .format("parquet") \
-    .option("path", OUTPUT_PATH_ANOMALY) \
+    .format("delta") \
     .option("checkpointLocation", CHECKPOINT_PATH_ANOMALY) \
+    .option("path", OUTPUT_PATH_ANOMALY) \
     .trigger(processingTime="10 seconds") \
     .start()
 
-#device type distribution
+#device stats
 device_stats_df = json_stream \
     .withWatermark("event_timestamp", "1 minute") \
     .groupBy(
@@ -94,9 +97,9 @@ device_stats_df = json_stream \
 
 query_devices = device_stats_df.writeStream \
     .outputMode("append") \
-    .format("parquet") \
-    .option("path", OUTPUT_PATH_DEVICES) \
+    .format("delta") \
     .option("checkpointLocation", CHECKPOINT_PATH_DEVICES) \
+    .option("path", OUTPUT_PATH_DEVICES) \
     .trigger(processingTime="10 seconds") \
     .start()
 
@@ -111,9 +114,9 @@ trending_pages_df = json_stream \
 
 query_pages = trending_pages_df.writeStream \
     .outputMode("append") \
-    .format("parquet") \
-    .option("path", OUTPUT_PATH_TRENDING) \
+    .format("delta") \
     .option("checkpointLocation", CHECKPOINT_PATH_TRENDING) \
+    .option("path", OUTPUT_PATH_TRENDING) \
     .trigger(processingTime="30 seconds") \
     .start()
 
@@ -132,9 +135,9 @@ session_stats_df = json_stream \
 
 query_sessions = session_stats_df.writeStream \
     .outputMode("append") \
-    .format("parquet") \
-    .option("path", OUTPUT_PATH_SESSIONS) \
+    .format("delta") \
     .option("checkpointLocation", CHECKPOINT_PATH_SESSIONS) \
+    .option("path", OUTPUT_PATH_SESSIONS) \
     .trigger(processingTime="30 seconds") \
     .start()
 
