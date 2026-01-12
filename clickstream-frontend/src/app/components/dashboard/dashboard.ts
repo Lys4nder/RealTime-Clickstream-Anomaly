@@ -14,10 +14,12 @@ Chart.register(...registerables);
 export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('monthlySalesChart') monthlySalesCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('hourlyActivityChart') hourlyActivityCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('countryOrdersChart') countryOrdersCanvas!: ElementRef<HTMLCanvasElement>;
 
   private analyticsSubscription?: Subscription;
   private monthlySalesChart?: Chart;
   private hourlyActivityChart?: Chart;
+  private countryOrdersChart?: Chart;
   
   // Expose Object to template
   Object = Object;
@@ -44,6 +46,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
     this.analyticsSubscription?.unsubscribe();
     this.monthlySalesChart?.destroy();
     this.hourlyActivityChart?.destroy();
+    this.countryOrdersChart?.destroy();
   }
 
   loadAnalytics(): void {
@@ -78,6 +81,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
 
     // Create charts after data is loaded
     this.createMonthlySalesChart();
+    this.createCountryOrdersChart();
     this.createHourlyActivityChart();
   }
 
@@ -158,7 +162,43 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
+createCountryOrdersChart(): void {
+    if (this.countryOrdersChart) {
+      this.countryOrdersChart.destroy();
+    }
 
+    const ctx = this.countryOrdersCanvas.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    this.countryOrdersChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: this.countryOrdersData.map(item => item.shipping_country),
+        datasets: [{
+          label: 'Orders',
+          data: this.countryOrdersData.map(item => item.count),
+          backgroundColor: 'rgba(67, 233, 123, 0.8)',
+          borderColor: 'rgba(56, 249, 215, 1)',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  }
+
+  
   getMonthName(month: number): string {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1] || '';

@@ -295,6 +295,11 @@
   height: 100% !important;
 }
 
+.analytics-chart.country-chart {
+  min-height: 350px;
+  height: 350px;
+}
+
 .chart-bars.horizontal {
   display: flex;
   flex-direction: column;

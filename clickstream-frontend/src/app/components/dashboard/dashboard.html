@@ -71,18 +71,8 @@
           <h3>Top Countries by Orders (Q1)</h3>
           <span class="graph-badge info">Top: {{ topCountry }}</span>
         </div>
-        <div class="analytics-chart">
-          <div class="chart-bars horizontal">
-            <div class="bar-item" *ngFor="let item of countryOrdersData.slice(0, 8)">
-              <span class="bar-label">{{ item.shipping_country }}</span>
-              <div class="bar-container">
-                <div class="bar-fill country" 
-                     [style.width.%]="(item.count / getMaxValue(countryOrdersData, 'count')) * 100">
-                </div>
-              </div>
-              <span class="bar-value">{{ item.count }}</span>
-            </div>
-          </div>
+        <div class="analytics-chart country-chart">
+          <canvas #countryOrdersChart></canvas>
         </div>
       </div>
     </div>
