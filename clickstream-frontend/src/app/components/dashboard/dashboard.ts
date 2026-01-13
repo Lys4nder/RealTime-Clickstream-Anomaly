@@ -55,7 +55,6 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   ngOnInit(): void {
     this.loadAnalytics();
     this.startPolling();
-    this.loadRealtimeData();
     this.connectWebSockets();
   }
 
@@ -225,20 +224,11 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    // Initialize realtime charts after view is ready
-    // Use longer timeout to ensure data has loaded
-    setTimeout(() => {
-      console.log('Initializing realtime charts with data:', {
-        anomalies: this.anomaliesData.length,
-        devices: this.devicesData.length,
-        trending: this.trendingData.length,
-        sessions: this.sessionsData.length
-      });
-      this.createAnomaliesChart();
-      this.createDevicesChart();
-      this.createTrendingChart();
-      this.createSessionsChart();
-    }, 50);
+    console.log('Initializing realtime charts (empty, waiting for WebSocket data)');
+    this.createAnomaliesChart();
+    this.createDevicesChart();
+    this.createTrendingChart();
+    this.createSessionsChart();
   }
 
   ngOnDestroy(): void {

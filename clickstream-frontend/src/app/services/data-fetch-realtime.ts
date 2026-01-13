@@ -37,7 +37,7 @@ export class DataFetchRealtimeService {
     private apiUrl = environment.apiUrl;
     private maxAttempts = 3;
     private retryDelay = 1000; // 1 second
-    private bufferTime = 500; // Buffer messages for 500ms
+    private bufferTime = 200; // Buffer messages for 200ms (reduced for faster updates)
     private buffers: Map<string, any[]> = new Map();
     private bufferTimers: Map<string, any> = new Map();
 
@@ -127,7 +127,7 @@ export class DataFetchRealtimeService {
         this.buffers.set(bufferId, []);
 
         ws.onopen = () => {
-            console.log(`WebSocket connected to ${url}`);
+            console.log(`WebSocket connected to ${url} - data streaming will begin shortly`);
         };
 
         ws.onmessage = (event) => {
@@ -144,7 +144,7 @@ export class DataFetchRealtimeService {
         };
 
         ws.onclose = () => {
-            console.log(`WebSocket disconnected from ${url}`);
+            console.log(`WebSocket disconnected from ${url} - data streaming has stopped`);
             // Clean up buffer and timer
             this.clearBuffer(bufferId);
         };
