@@ -4,21 +4,6 @@ import { Observable, throwError, timer } from 'rxjs';
 import { catchError, retryWhen, mergeMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
-export interface MonthlySpend {
-  month: number;
-  total_sales: number;
-}
-
-export interface CountryOrders {
-  shipping_country: string;
-  count: number;
-}
-
-export interface HourlyActivity {
-  hour: number;
-  count: number;
-}
-
 export interface Anomaly {
   [key: string]: any;
 }
@@ -38,9 +23,9 @@ export interface Session {
 @Injectable({
   providedIn: 'root',
 })
-export class DataFetchService {
+export class DataFetchRealtimeService {
     private apiUrl = environment.apiUrl;
-    private maxAttempts = 3; 
+    private maxAttempts = 3;
     private retryDelay = 1000; // 1 second
 
     constructor(private http: HttpClient) { }
@@ -59,25 +44,88 @@ export class DataFetchService {
         );
     }
 
-    fetchMonthlySpend(): Observable<MonthlySpend[]> {
-        return this.http.get<MonthlySpend[]>(`${this.apiUrl}/batch/monthly-sales`).pipe(
+    // Real-time HTTP endpoints
+    fetchAnomalies(): Observable<Anomaly[]> {
+        return this.http.get<Anomaly[]>(`${this.apiUrl}/realtime/anomalies`).pipe(
             this.retryWithBackoff(),
-            catchError((error) => this.handleError(error, 'monthly sales data'))
+            catchError((error) => this.handleError(error, 'anomalies data'))
         );
     }
 
-    fetchCountryOrders(): Observable<CountryOrders[]> {
-        return this.http.get<CountryOrders[]>(`${this.apiUrl}/batch/country-stats`).pipe(
+    fetchDevices(): Observable<Device[]> {
+        return this.http.get<Device[]>(`${this.apiUrl}/realtime/devices`).pipe(
             this.retryWithBackoff(),
-            catchError((error) => this.handleError(error, 'country statistics'))
+            catchError((error) => this.handleError(error, 'devices data'))
         );
     }
 
-    fetchHourlyActivity(): Observable<HourlyActivity[]> {
-        return this.http.get<HourlyActivity[]>(`${this.apiUrl}/batch/hourly-peaks`).pipe(
+    fetchTrending(): Observable<TrendingPage[]> {
+        return this.http.get<TrendingPage[]>(`${this.apiUrl}/realtime/trending`).pipe(
             this.retryWithBackoff(),
-            catchError((error) => this.handleError(error, 'hourly activity data'))
+            catchError((error) => this.handleError(error, 'trending pages data'))
         );
+    }
+
+    fetchSessions(): Observable<Session[]> {
+        return this.http.get<Session[]>(`${this.apiUrl}/realtime/sessions`).pipe(
+            this.retryWithBackoff(),
+            catchError((error) => this.handleError(error, 'sessions data'))
+        );
+    }
+
+    // WebSocket connections for real-time streaming
+    connectAnomaliesWebSocket(callback: (data: any) => void): WebSocket {
+        const wsUrl = this.getWebSocketUrl('/realtime/ws/anomalies');
+        return this.connectWebSocket(wsUrl, callback);
+    }
+
+    connectDevicesWebSocket(callback: (data: any) => void): WebSocket {
+        const wsUrl = this.getWebSocketUrl('/realtime/ws/devices');
+        return this.connectWebSocket(wsUrl, callback);
+    }
+
+    connectTrendingWebSocket(callback: (data: any) => void): WebSocket {
+        const wsUrl = this.getWebSocketUrl('/realtime/ws/trending');
+        return this.connectWebSocket(wsUrl, callback);
+    }
+
+    connectSessionsWebSocket(callback: (data: any) => void): WebSocket {
+        const wsUrl = this.getWebSocketUrl('/realtime/ws/sessions');
+        return this.connectWebSocket(wsUrl, callback);
+    }
+
+    private getWebSocketUrl(path: string): string {
+        // Convert http/https URL to ws/wss
+        const wsProtocol = this.apiUrl.startsWith('https') ? 'wss' : 'ws';
+        const baseUrl = this.apiUrl.replace(/^https?:\/\//, '');
+        return `${wsProtocol}://${baseUrl}${path}`;
+    }
+
+    private connectWebSocket(url: string, callback: (data: any) => void): WebSocket {
+        const ws = new WebSocket(url);
+
+        ws.onopen = () => {
+            console.log(`WebSocket connected to ${url}`);
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                callback(data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = () => {
+            console.log(`WebSocket disconnected from ${url}`);
+        };
+
+        return ws;
     }
 
     private shouldRetry(error: any): boolean {
