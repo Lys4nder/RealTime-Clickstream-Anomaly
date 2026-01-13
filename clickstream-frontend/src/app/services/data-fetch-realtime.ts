@@ -20,6 +20,16 @@ export interface Session {
   [key: string]: any;
 }
 
+/**
+ * DataFetchRealtimeService provides real-time data streaming via WebSockets
+ * with built-in buffering and deduplication.
+ * 
+ * Features:
+ * - Buffers incoming WebSocket messages for 500ms (configurable)
+ * - Deduplicates messages based on unique identifiers (session_id, user_id, etc.)
+ * - Reduces chart update frequency and prevents duplicate data processing
+ * - Automatically cleans up buffers on WebSocket disconnect
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -27,6 +37,9 @@ export class DataFetchRealtimeService {
     private apiUrl = environment.apiUrl;
     private maxAttempts = 3;
     private retryDelay = 1000; // 1 second
+    private bufferTime = 500; // Buffer messages for 500ms
+    private buffers: Map<string, any[]> = new Map();
+    private bufferTimers: Map<string, any> = new Map();
 
     constructor(private http: HttpClient) { }
 
@@ -74,24 +87,29 @@ export class DataFetchRealtimeService {
     }
 
     // WebSocket connections for real-time streaming
-    connectAnomaliesWebSocket(callback: (data: any) => void): WebSocket {
+    connectAnomaliesWebSocket(callback: (data: any[]) => void): WebSocket {
         const wsUrl = this.getWebSocketUrl('/realtime/ws/anomalies');
         return this.connectWebSocket(wsUrl, callback);
     }
 
-    connectDevicesWebSocket(callback: (data: any) => void): WebSocket {
+    connectDevicesWebSocket(callback: (data: any[]) => void): WebSocket {
         const wsUrl = this.getWebSocketUrl('/realtime/ws/devices');
         return this.connectWebSocket(wsUrl, callback);
     }
 
-    connectTrendingWebSocket(callback: (data: any) => void): WebSocket {
+    connectTrendingWebSocket(callback: (data: any[]) => void): WebSocket {
         const wsUrl = this.getWebSocketUrl('/realtime/ws/trending');
         return this.connectWebSocket(wsUrl, callback);
     }
 
-    connectSessionsWebSocket(callback: (data: any) => void): WebSocket {
+    connectSessionsWebSocket(callback: (data: any[]) => void): WebSocket {
         const wsUrl = this.getWebSocketUrl('/realtime/ws/sessions');
         return this.connectWebSocket(wsUrl, callback);
+    }
+
+    // Allow configuring buffer time
+    setBufferTime(milliseconds: number): void {
+        this.bufferTime = milliseconds;
     }
 
     private getWebSocketUrl(path: string): string {
@@ -101,8 +119,12 @@ export class DataFetchRealtimeService {
         return `${wsProtocol}://${baseUrl}${path}`;
     }
 
-    private connectWebSocket(url: string, callback: (data: any) => void): WebSocket {
+    private connectWebSocket(url: string, callback: (data: any[]) => void): WebSocket {
         const ws = new WebSocket(url);
+        const bufferId = url;
+
+        // Initialize buffer for this WebSocket
+        this.buffers.set(bufferId, []);
 
         ws.onopen = () => {
             console.log(`WebSocket connected to ${url}`);
@@ -111,7 +133,7 @@ export class DataFetchRealtimeService {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                callback(data);
+                this.addToBuffer(bufferId, data, callback);
             } catch (error) {
                 console.error('Error parsing WebSocket message:', error);
             }
@@ -123,9 +145,86 @@ export class DataFetchRealtimeService {
 
         ws.onclose = () => {
             console.log(`WebSocket disconnected from ${url}`);
+            // Clean up buffer and timer
+            this.clearBuffer(bufferId);
         };
 
         return ws;
+    }
+
+    private addToBuffer(bufferId: string, data: any, callback: (data: any[]) => void): void {
+        const buffer = this.buffers.get(bufferId) || [];
+        buffer.push(data);
+        this.buffers.set(bufferId, buffer);
+
+        // Clear existing timer
+        if (this.bufferTimers.has(bufferId)) {
+            clearTimeout(this.bufferTimers.get(bufferId));
+        }
+
+        // Set new timer to flush buffer
+        const timer = setTimeout(() => {
+            this.flushBuffer(bufferId, callback);
+        }, this.bufferTime);
+
+        this.bufferTimers.set(bufferId, timer);
+    }
+
+    private flushBuffer(bufferId: string, callback: (data: any[]) => void): void {
+        const buffer = this.buffers.get(bufferId) || [];
+        
+        if (buffer.length === 0) {
+            return;
+        }
+
+        // Deduplicate messages based on unique identifiers
+        const deduplicatedData = this.deduplicateData(buffer);
+        
+        console.log(`Flushed buffer: ${buffer.length} messages, ${deduplicatedData.length} unique after deduplication`);
+        
+        // Send entire batch to the callback
+        callback(deduplicatedData);
+
+        // Clear the buffer
+        this.buffers.set(bufferId, []);
+        this.bufferTimers.delete(bufferId);
+    }
+
+    private deduplicateData(dataArray: any[]): any[] {
+        // Try to deduplicate based on common identifier fields
+        const seen = new Set<string>();
+        const deduplicated: any[] = [];
+
+        for (const item of dataArray) {
+            let key: string;
+            
+            if (item.session_id && item.event_timestamp) {
+                key = `${item.session_id}-${item.event_timestamp}`;
+            } else if (item.user_id && item.event_timestamp) {
+                key = `${item.user_id}-${item.event_timestamp}`;
+            } else if (item.page_section && item.event_timestamp) {
+                key = `${item.page_section}-${item.event_timestamp}`;
+            } else if (item.device_type && item.event_timestamp) {
+                key = `${item.device_type}-${item.event_timestamp}`;
+            } else {
+                key = JSON.stringify(item);
+            }
+
+            if (!seen.has(key)) {
+                seen.add(key);
+                deduplicated.push(item);
+            }
+        }
+
+        return deduplicated;
+    }
+
+    private clearBuffer(bufferId: string): void {
+        if (this.bufferTimers.has(bufferId)) {
+            clearTimeout(this.bufferTimers.get(bufferId));
+            this.bufferTimers.delete(bufferId);
+        }
+        this.buffers.delete(bufferId);
     }
 
     private shouldRetry(error: any): boolean {

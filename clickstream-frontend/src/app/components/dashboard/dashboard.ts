@@ -25,7 +25,11 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   private analyticsSubscription?: Subscription;
   private pollingSubscription?: Subscription;
   private realtimeSubscription?: Subscription;
-  private realtimePollingSubscription?: Subscription;
+  // WebSocket connections for real-time streaming
+  private anomaliesWs?: WebSocket;
+  private devicesWs?: WebSocket;
+  private trendingWs?: WebSocket;
+  private sessionsWs?: WebSocket;
   private monthlySalesChart?: Chart;
   private hourlyActivityChart?: Chart;
   private countryOrdersChart?: Chart;
@@ -52,79 +56,86 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
     this.loadAnalytics();
     this.startPolling();
     this.loadRealtimeData();
-    this.startRealtimePolling();
+    this.connectWebSockets();
   }
 
   loadRealtimeData(): void {
-    this.realtimeSubscription = forkJoin({
-      anomalies: this.dataFetchRealtimeService.fetchAnomalies(),
-      devices: this.dataFetchRealtimeService.fetchDevices(),
-      trending: this.dataFetchRealtimeService.fetchTrending(),
-      sessions: this.dataFetchRealtimeService.fetchSessions()
-    }).subscribe({
+    // Load each dataset independently - don't wait for all to complete
+    this.dataFetchRealtimeService.fetchAnomalies().subscribe({
       next: (data) => {
-        console.log('🔍 SAMPLE DATA STRUCTURES:');
-        console.log('Trending sample:', data.trending.slice(0, 3));
-        console.log('Sessions sample:', data.sessions.slice(0, 3));
-        console.log('Anomalies sample:', data.anomalies.slice(0, 3));
-        console.log('Devices sample:', data.devices.slice(0, 3));
-        console.log('Realtime data loaded:', {
-          anomalies: data.anomalies.length,
-          devices: data.devices.length,
-          trending: data.trending.length,
-          sessions: data.sessions.length
-        });
-        this.anomaliesData = data.anomalies;
-        this.devicesData = data.devices;
-        this.trendingData = data.trending;
-        this.sessionsData = data.sessions;
-        this.updateRealtimeCharts();
+        console.log('Anomalies loaded:', data.length, 'items');
+        console.log('Anomalies preview:', data.slice(0, 3));
+        this.anomaliesData = data;
+        this.updateAnomaliesChart();
       },
-      error: (err) => console.error('Error fetching realtime data:', err)
+      error: (err) => console.error('Error fetching anomalies:', err)
+    });
+
+    this.dataFetchRealtimeService.fetchDevices().subscribe({
+      next: (data) => {
+        console.log('Devices loaded:', data.length, 'items');
+        console.log('Devices preview:', data.slice(0, 3));
+        this.devicesData = data;
+        this.updateDevicesChart();
+      },
+      error: (err) => console.error('Error fetching devices:', err)
+    });
+
+    this.dataFetchRealtimeService.fetchTrending().subscribe({
+      next: (data) => {
+        console.log('Trending loaded:', data.length, 'items');
+        console.log('Trending preview:', data.slice(0, 3));
+        this.trendingData = data;
+        this.updateTrendingChart();
+      },
+      error: (err) => console.error('Error fetching trending:', err)
+    });
+
+    this.dataFetchRealtimeService.fetchSessions().subscribe({
+      next: (data) => {
+        console.log('Sessions loaded:', data.length, 'items');
+        console.log('Sessions preview:', data.slice(0, 3));
+        this.sessionsData = data;
+        this.updateSessionsChart();
+      },
+      error: (err) => console.error('Error fetching sessions:', err)
     });
   }
 
-  startRealtimePolling(): void {
-    this.realtimePollingSubscription = interval(1000 * 60 )
-      .pipe(
-        switchMap(() => forkJoin({
-          anomalies: this.dataFetchRealtimeService.fetchAnomalies(),
-          devices: this.dataFetchRealtimeService.fetchDevices(),
-          trending: this.dataFetchRealtimeService.fetchTrending(),
-          sessions: this.dataFetchRealtimeService.fetchSessions()
-        }))
-      )
-      .subscribe({
-        next: (data) => {
-          console.log('Realtime data updated at:', new Date().toLocaleTimeString());
-          this.anomaliesData = data.anomalies;
-          this.devicesData = data.devices;
-          this.trendingData = data.trending;
-          this.sessionsData = data.sessions;
-          this.updateRealtimeCharts();
-        },
-        error: (err) => {
-          console.warn('Realtime polling error (will retry):', err.message || err);
-        }
-      });
+  connectWebSockets(): void {
+    console.log('Connecting to WebSockets for real-time streaming...');
+
+    // Anomalies WebSocket - receives batches
+    this.anomaliesWs = this.dataFetchRealtimeService.connectAnomaliesWebSocket((dataBatch) => {
+      console.log(`Anomaly batch received: ${dataBatch.length} items`);
+      this.anomaliesData = [...dataBatch, ...this.anomaliesData].slice(0, 100);
+      this.updateAnomaliesChart();
+    });
+
+    // Devices WebSocket - receives batches
+    this.devicesWs = this.dataFetchRealtimeService.connectDevicesWebSocket((dataBatch) => {
+      console.log(`Device batch received: ${dataBatch.length} items`);
+      this.devicesData = [...dataBatch, ...this.devicesData].slice(0, 100);
+      this.updateDevicesChart();
+    });
+
+    // Trending WebSocket - receives batches
+    this.trendingWs = this.dataFetchRealtimeService.connectTrendingWebSocket((dataBatch) => {
+      console.log(`Trending batch received: ${dataBatch.length} items`);
+      this.trendingData = [...dataBatch, ...this.trendingData].slice(0, 100);
+      this.updateTrendingChart();
+    });
+
+    // Sessions WebSocket - receives batches
+    this.sessionsWs = this.dataFetchRealtimeService.connectSessionsWebSocket((dataBatch) => {
+      console.log(`Session batch received: ${dataBatch.length} items`);
+      this.sessionsData = [...dataBatch, ...this.sessionsData].slice(0, 100);
+      this.updateSessionsChart();
+    });
   }
 
-  updateRealtimeCharts(): void {
-    console.log('📊 updateRealtimeCharts called at:', new Date().toLocaleTimeString());
-    console.log('📊 Chart instances exist:', {
-      anomalies: !!this.anomaliesChart,
-      devices: !!this.devicesChart,
-      trending: !!this.trendingChart,
-      sessions: !!this.sessionsChart
-    });
-    console.log('📊 Data lengths:', {
-      anomalies: this.anomaliesData.length,
-      devices: this.devicesData.length,
-      trending: this.trendingData.length,
-      sessions: this.sessionsData.length
-    });
-
-    // Update Anomalies Chart - show actions_count over time for anomalous users
+  // Individual chart update methods for WebSocket streaming
+  updateAnomaliesChart(): void {
     if (this.anomaliesChart && this.anomaliesData.length > 0) {
       const recentAnomalies = [...this.anomaliesData]
         .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
@@ -135,53 +146,15 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
       }).reverse();
       const actionsData = recentAnomalies.map(item => item.actions_count).reverse();
       
-      // Mutate existing arrays for Chart.js reactivity
       this.anomaliesChart.data.labels!.length = 0;
       this.anomaliesChart.data.labels!.push(...timeLabels);
       this.anomaliesChart.data.datasets[0].data.length = 0;
       (this.anomaliesChart.data.datasets[0].data as number[]).push(...actionsData);
       this.anomaliesChart.update('active');
-      console.log('Anomalies chart updated with values:', actionsData);
     }
+  }
 
-    // Update Trending Chart - show page_section and visit_count
-    if (this.trendingChart && this.trendingData.length > 0) {
-      const topTrending = [...this.trendingData]
-        .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
-        .slice(0, 10);
-      const pageLabels = topTrending.map(item => item.page_section || 'Unknown');
-      const viewCounts = topTrending.map(item => item.visit_count || 0);
-      
-      // Mutate existing arrays for Chart.js reactivity
-      this.trendingChart.data.labels!.length = 0;
-      this.trendingChart.data.labels!.push(...pageLabels);
-      this.trendingChart.data.datasets[0].data.length = 0;
-      (this.trendingChart.data.datasets[0].data as number[]).push(...viewCounts);
-      this.trendingChart.update('active');
-      console.log('Trending chart updated with values:', viewCounts);
-    }
-
-    // Update Sessions Chart - show session activity over time
-    if (this.sessionsChart && this.sessionsData.length > 0) {
-      const recentSessions = [...this.sessionsData]
-        .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
-        .slice(0, 10);
-      const sessionLabels = recentSessions.map(item => {
-        const date = new Date(item.event_timestamp);
-        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
-      }).reverse();
-      const sessionCounts = recentSessions.map(item => item.events_in_session || 1).reverse();
-      
-      // Mutate existing arrays for Chart.js reactivity
-      this.sessionsChart.data.labels!.length = 0;
-      this.sessionsChart.data.labels!.push(...sessionLabels);
-      this.sessionsChart.data.datasets[0].data.length = 0;
-      (this.sessionsChart.data.datasets[0].data as number[]).push(...sessionCounts);
-      this.sessionsChart.update('active');
-      console.log('Sessions chart updated with values:', sessionCounts);
-    }
-
-    // Update Devices Chart - aggregate by device_type
+  updateDevicesChart(): void {
     if (this.devicesChart && this.devicesData.length > 0) {
       const deviceTotals = this.devicesData.reduce((acc, item) => {
         const type = (item.device_type || 'UNKNOWN').toUpperCase();
@@ -195,12 +168,53 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
         deviceTotals['TABLET'] || 0
       ];
       
-      // Mutate existing arrays for Chart.js reactivity
       this.devicesChart.data.datasets[0].data.length = 0;
       (this.devicesChart.data.datasets[0].data as number[]).push(...deviceValues);
       this.devicesChart.update('active');
-      console.log('Devices chart updated with values:', deviceValues);
     }
+  }
+
+  updateTrendingChart(): void {
+    if (this.trendingChart && this.trendingData.length > 0) {
+      const topTrending = [...this.trendingData]
+        .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
+        .slice(0, 10);
+      const pageLabels = topTrending.map(item => item.page_section || 'Unknown');
+      const viewCounts = topTrending.map(item => item.visit_count || 0);
+      
+      this.trendingChart.data.labels!.length = 0;
+      this.trendingChart.data.labels!.push(...pageLabels);
+      this.trendingChart.data.datasets[0].data.length = 0;
+      (this.trendingChart.data.datasets[0].data as number[]).push(...viewCounts);
+      this.trendingChart.update('active');
+    }
+  }
+
+  updateSessionsChart(): void {
+    if (this.sessionsChart && this.sessionsData.length > 0) {
+      const recentSessions = [...this.sessionsData]
+        .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+        .slice(0, 10);
+      const sessionLabels = recentSessions.map(item => {
+        const date = new Date(item.event_timestamp);
+        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      }).reverse();
+      const sessionCounts = recentSessions.map(item => item.events_in_session || 1).reverse();
+      
+      this.sessionsChart.data.labels!.length = 0;
+      this.sessionsChart.data.labels!.push(...sessionLabels);
+      this.sessionsChart.data.datasets[0].data.length = 0;
+      (this.sessionsChart.data.datasets[0].data as number[]).push(...sessionCounts);
+      this.sessionsChart.update('active');
+    }
+  }
+
+  updateRealtimeCharts(): void {
+    // Call individual chart update methods
+    this.updateAnomaliesChart();
+    this.updateTrendingChart();
+    this.updateSessionsChart();
+    this.updateDevicesChart();
   }
 
   processRealtimeData(): void {
@@ -224,14 +238,19 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
       this.createDevicesChart();
       this.createTrendingChart();
       this.createSessionsChart();
-    }, 500);
+    }, 50);
   }
 
   ngOnDestroy(): void {
     this.analyticsSubscription?.unsubscribe();
     this.pollingSubscription?.unsubscribe();
     this.realtimeSubscription?.unsubscribe();
-    this.realtimePollingSubscription?.unsubscribe();
+    // Close WebSocket connections
+    this.anomaliesWs?.close();
+    this.devicesWs?.close();
+    this.trendingWs?.close();
+    this.sessionsWs?.close();
+    // Destroy charts
     this.monthlySalesChart?.destroy();
     this.hourlyActivityChart?.destroy();
     this.countryOrdersChart?.destroy();
