@@ -25,6 +25,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   private analyticsSubscription?: Subscription;
   private pollingSubscription?: Subscription;
   private realtimeSubscription?: Subscription;
+  private realtimePollingSubscription?: Subscription;
   private monthlySalesChart?: Chart;
   private hourlyActivityChart?: Chart;
   private countryOrdersChart?: Chart;
@@ -62,6 +63,11 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
       sessions: this.dataFetchRealtimeService.fetchSessions()
     }).subscribe({
       next: (data) => {
+        console.log('🔍 SAMPLE DATA STRUCTURES:');
+        console.log('Trending sample:', data.trending.slice(0, 3));
+        console.log('Sessions sample:', data.sessions.slice(0, 3));
+        console.log('Anomalies sample:', data.anomalies.slice(0, 3));
+        console.log('Devices sample:', data.devices.slice(0, 3));
         console.log('Realtime data loaded:', {
           anomalies: data.anomalies.length,
           devices: data.devices.length,
@@ -79,7 +85,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   }
 
   startRealtimePolling(): void {
-    interval(5000)
+    this.realtimePollingSubscription = interval(1000 * 60 )
       .pipe(
         switchMap(() => forkJoin({
           anomalies: this.dataFetchRealtimeService.fetchAnomalies(),
@@ -104,56 +110,96 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updateRealtimeCharts(): void {
-    console.log('Updating charts with data lengths:', {
+    console.log('📊 updateRealtimeCharts called at:', new Date().toLocaleTimeString());
+    console.log('📊 Chart instances exist:', {
+      anomalies: !!this.anomaliesChart,
+      devices: !!this.devicesChart,
+      trending: !!this.trendingChart,
+      sessions: !!this.sessionsChart
+    });
+    console.log('📊 Data lengths:', {
       anomalies: this.anomaliesData.length,
       devices: this.devicesData.length,
       trending: this.trendingData.length,
       sessions: this.sessionsData.length
     });
 
-    // Update Anomalies Chart
-    if (this.anomaliesChart) {
-      const anomaliesCount = Math.min(this.anomaliesData.length, 10);
-      if (anomaliesCount > 0) {
-        this.anomaliesChart.data.labels = Array.from({length: anomaliesCount}, (_, i) => `T${i + 1}`);
-        this.anomaliesChart.data.datasets[0].data = Array.from({length: anomaliesCount}, () => Math.random() * 100);
-        this.anomaliesChart.update('active');
-        console.log('Anomalies chart updated');
-      }
+    // Update Anomalies Chart - show actions_count over time for anomalous users
+    if (this.anomaliesChart && this.anomaliesData.length > 0) {
+      const recentAnomalies = [...this.anomaliesData]
+        .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+        .slice(0, 10);
+      const timeLabels = recentAnomalies.map(item => {
+        const date = new Date(item.event_timestamp);
+        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      }).reverse();
+      const actionsData = recentAnomalies.map(item => item.actions_count).reverse();
+      
+      // Mutate existing arrays for Chart.js reactivity
+      this.anomaliesChart.data.labels!.length = 0;
+      this.anomaliesChart.data.labels!.push(...timeLabels);
+      this.anomaliesChart.data.datasets[0].data.length = 0;
+      (this.anomaliesChart.data.datasets[0].data as number[]).push(...actionsData);
+      this.anomaliesChart.update('active');
+      console.log('Anomalies chart updated with values:', actionsData);
     }
 
-    // Update Trending Chart
-    if (this.trendingChart) {
-      const trendingCount = Math.min(this.trendingData.length, 5);
-      if (trendingCount > 0) {
-        this.trendingChart.data.labels = Array.from({length: trendingCount}, (_, i) => `Page ${i + 1}`);
-        this.trendingChart.data.datasets[0].data = Array.from({length: trendingCount}, () => Math.random() * 200);
-        this.trendingChart.update('active');
-        console.log('Trending chart updated');
-      }
+    // Update Trending Chart - show page_section and visit_count
+    if (this.trendingChart && this.trendingData.length > 0) {
+      const topTrending = [...this.trendingData]
+        .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
+        .slice(0, 10);
+      const pageLabels = topTrending.map(item => item.page_section || 'Unknown');
+      const viewCounts = topTrending.map(item => item.visit_count || 0);
+      
+      // Mutate existing arrays for Chart.js reactivity
+      this.trendingChart.data.labels!.length = 0;
+      this.trendingChart.data.labels!.push(...pageLabels);
+      this.trendingChart.data.datasets[0].data.length = 0;
+      (this.trendingChart.data.datasets[0].data as number[]).push(...viewCounts);
+      this.trendingChart.update('active');
+      console.log('Trending chart updated with values:', viewCounts);
     }
 
-    // Update Sessions Chart
-    if (this.sessionsChart) {
-      const sessionsCount = Math.min(this.sessionsData.length, 10);
-      if (sessionsCount > 0) {
-        this.sessionsChart.data.labels = Array.from({length: sessionsCount}, (_, i) => `S${i + 1}`);
-        this.sessionsChart.data.datasets[0].data = Array.from({length: sessionsCount}, () => Math.random() * 80);
-        this.sessionsChart.update('active');
-        console.log('Sessions chart updated');
-      }
+    // Update Sessions Chart - show session activity over time
+    if (this.sessionsChart && this.sessionsData.length > 0) {
+      const recentSessions = [...this.sessionsData]
+        .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+        .slice(0, 10);
+      const sessionLabels = recentSessions.map(item => {
+        const date = new Date(item.event_timestamp);
+        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      }).reverse();
+      const sessionCounts = recentSessions.map(item => item.events_in_session || 1).reverse();
+      
+      // Mutate existing arrays for Chart.js reactivity
+      this.sessionsChart.data.labels!.length = 0;
+      this.sessionsChart.data.labels!.push(...sessionLabels);
+      this.sessionsChart.data.datasets[0].data.length = 0;
+      (this.sessionsChart.data.datasets[0].data as number[]).push(...sessionCounts);
+      this.sessionsChart.update('active');
+      console.log('Sessions chart updated with values:', sessionCounts);
     }
 
-    // Update Devices Chart (less frequently as it's a pie chart)
+    // Update Devices Chart - aggregate by device_type
     if (this.devicesChart && this.devicesData.length > 0) {
-      const total = this.devicesData.length;
-      this.devicesChart.data.datasets[0].data = [
-        Math.floor(total * 0.45),
-        Math.floor(total * 0.35),
-        Math.floor(total * 0.20)
+      const deviceTotals = this.devicesData.reduce((acc, item) => {
+        const type = (item.device_type || 'UNKNOWN').toUpperCase();
+        acc[type] = (acc[type] || 0) + (item.device_count || 1);
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const deviceValues = [
+        deviceTotals['MOBILE'] || 0,
+        deviceTotals['DESKTOP'] || 0,
+        deviceTotals['TABLET'] || 0
       ];
+      
+      // Mutate existing arrays for Chart.js reactivity
+      this.devicesChart.data.datasets[0].data.length = 0;
+      (this.devicesChart.data.datasets[0].data as number[]).push(...deviceValues);
       this.devicesChart.update('active');
-      console.log('Devices chart updated');
+      console.log('Devices chart updated with values:', deviceValues);
     }
   }
 
@@ -166,19 +212,26 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
 
   ngAfterViewInit(): void {
     // Initialize realtime charts after view is ready
+    // Use longer timeout to ensure data has loaded
     setTimeout(() => {
-      console.log('Initializing realtime charts...');
+      console.log('Initializing realtime charts with data:', {
+        anomalies: this.anomaliesData.length,
+        devices: this.devicesData.length,
+        trending: this.trendingData.length,
+        sessions: this.sessionsData.length
+      });
       this.createAnomaliesChart();
       this.createDevicesChart();
       this.createTrendingChart();
       this.createSessionsChart();
-    }, 100);
+    }, 500);
   }
 
   ngOnDestroy(): void {
     this.analyticsSubscription?.unsubscribe();
     this.pollingSubscription?.unsubscribe();
     this.realtimeSubscription?.unsubscribe();
+    this.realtimePollingSubscription?.unsubscribe();
     this.monthlySalesChart?.destroy();
     this.hourlyActivityChart?.destroy();
     this.countryOrdersChart?.destroy();
@@ -386,52 +439,81 @@ createCountryOrdersChart(): void {
 
   createAnomaliesChart(): void {
     if (this.anomaliesChart) {
-      this.anomaliesChart.data.datasets[0].data = this.anomaliesData.map((_, i) => Math.random() * 100);
-      this.anomaliesChart.update();
+      this.updateRealtimeCharts();
       return;
     }
 
     const ctx = this.anomaliesCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
 
+    // Sort by timestamp and get recent data
+    const recentAnomalies = [...this.anomaliesData]
+      .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+      .slice(0, 10);
+    const timeLabels = recentAnomalies.map(item => {
+      const date = new Date(item.event_timestamp);
+      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }).reverse();
+    const actionsData = recentAnomalies.map(item => item.actions_count || 0).reverse();
+
     this.anomaliesChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: this.anomaliesData.map((_, i) => `T${i + 1}`),
+        labels: timeLabels,
         datasets: [{
-          label: 'Anomaly Score',
-          data: this.anomaliesData.map((_, i) => Math.random() * 100),
+          label: 'Actions Count',
+          data: actionsData,
           borderColor: 'rgba(245, 87, 108, 1)',
           backgroundColor: 'rgba(245, 87, 108, 0.1)',
           tension: 0.4,
-          fill: true
+          fill: true,
+          pointBackgroundColor: this.anomaliesData.slice(0, 10).map(item => 
+            item.is_anomaly ? 'rgba(255, 0, 0, 1)' : 'rgba(245, 87, 108, 1)'
+          ).reverse()
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Actions: ${context.parsed.y}`
+            }
+          }
+        },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Actions' } } }
       }
     });
   }
 
   createDevicesChart(): void {
     if (this.devicesChart) {
-      this.devicesChart.data.datasets[0].data = this.devicesData.map((_, i) => Math.random() * 50);
-      this.devicesChart.update();
+      this.updateRealtimeCharts();
       return;
     }
 
     const ctx = this.devicesCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
 
+    // Aggregate device counts by type
+    const deviceTotals = this.devicesData.reduce((acc, item) => {
+      const type = (item.device_type || 'UNKNOWN').toUpperCase();
+      acc[type] = (acc[type] || 0) + (item.device_count || 1);
+      return acc;
+    }, {} as Record<string, number>);
+
     this.devicesChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
         labels: ['Mobile', 'Desktop', 'Tablet'],
         datasets: [{
-          data: [45, 35, 20],
+          data: [
+            deviceTotals['MOBILE'] || 0,
+            deviceTotals['DESKTOP'] || 0,
+            deviceTotals['TABLET'] || 0
+          ],
           backgroundColor: [
             'rgba(79, 172, 254, 0.8)',
             'rgba(240, 147, 251, 0.8)',
@@ -443,28 +525,41 @@ createCountryOrdersChart(): void {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } }
+        plugins: { 
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${context.parsed} events`
+            }
+          }
+        }
       }
     });
   }
 
   createTrendingChart(): void {
     if (this.trendingChart) {
-      this.trendingChart.data.datasets[0].data = this.trendingData.map((_, i) => Math.random() * 200);
-      this.trendingChart.update();
+      this.updateRealtimeCharts();
       return;
     }
 
     const ctx = this.trendingCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
 
+    // Get top trending pages by visit_count
+    const topTrending = [...this.trendingData]
+      .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
+      .slice(0, 10);
+    const pageLabels = topTrending.map(item => item.page_section || 'Unknown');
+    const viewCounts = topTrending.map(item => item.visit_count || 0);
+
     this.trendingChart = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: this.trendingData.slice(0, 5).map((_, i) => `Page ${i + 1}`),
+        labels: pageLabels,
         datasets: [{
           label: 'Page Views',
-          data: this.trendingData.slice(0, 5).map((_, i) => Math.random() * 200),
+          data: viewCounts,
           backgroundColor: 'rgba(56, 249, 215, 0.8)',
           borderColor: 'rgba(67, 233, 123, 1)',
           borderWidth: 2
@@ -474,29 +569,45 @@ createCountryOrdersChart(): void {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true } }
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Views: ${context.parsed.x}`
+            }
+          }
+        },
+        scales: { x: { beginAtZero: true, title: { display: true, text: 'Views' } } }
       }
     });
   }
 
   createSessionsChart(): void {
     if (this.sessionsChart) {
-      this.sessionsChart.data.datasets[0].data = this.sessionsData.map((_, i) => Math.random() * 80);
-      this.sessionsChart.update();
+      this.updateRealtimeCharts();
       return;
     }
 
     const ctx = this.sessionsCanvas?.nativeElement?.getContext('2d');
     if (!ctx) return;
 
+    // Sort by timestamp and show session activity over time
+    const recentSessions = [...this.sessionsData]
+      .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+      .slice(0, 10);
+    const sessionLabels = recentSessions.map(item => {
+      const date = new Date(item.event_timestamp);
+      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }).reverse();
+    const sessionCounts = recentSessions.map(item => item.events_in_session || 1).reverse();
+
     this.sessionsChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: this.sessionsData.map((_, i) => `S${i + 1}`),
+        labels: sessionLabels,
         datasets: [{
           label: 'Active Sessions',
-          data: this.sessionsData.map((_, i) => Math.random() * 80),
+          data: sessionCounts,
           borderColor: 'rgba(79, 172, 254, 1)',
           backgroundColor: 'rgba(79, 172, 254, 0.1)',
           tension: 0.4,
@@ -506,8 +617,15 @@ createCountryOrdersChart(): void {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Sessions: ${context.parsed.y}`
+            }
+          }
+        },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Sessions' } } }
       }
     });
   }
