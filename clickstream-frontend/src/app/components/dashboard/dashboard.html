@@ -77,4 +77,54 @@
       </div>
     </div>
   </div>
+
+  <!-- Real-time Analytics Section -->
+  <div class="graphs-section">
+    <h2 class="section-title">Real-time Clickstream Analytics</h2>
+    <div class="graphs-grid">
+      <!-- Anomalies Detection -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Anomaly Detection</h3>
+          <span class="graph-badge danger">Real-time</span>
+        </div>
+        <div class="analytics-chart">
+          <canvas #anomaliesChart></canvas>
+        </div>
+      </div>
+
+      <!-- Device Distribution -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Device Distribution</h3>
+          <span class="graph-badge info">Live</span>
+        </div>
+        <div class="analytics-chart">
+          <canvas #devicesChart></canvas>
+        </div>
+      </div>
+
+      <!-- Trending Pages -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Trending Pages</h3>
+          <span class="graph-badge success">Top 5</span>
+        </div>
+        <div class="analytics-chart">
+          <canvas #trendingChart></canvas>
+        </div>
+      </div>
+
+      <!-- Active Sessions -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <h3>Active Sessions</h3>
+          <span class="graph-badge warning">Streaming</span>
+        </div>
+        <div class="analytics-chart">
+          <canvas #sessionsChart></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

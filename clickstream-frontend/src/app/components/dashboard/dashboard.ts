@@ -2,7 +2,8 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } fr
 import { DataFetchService, MonthlySpend, CountryOrders, HourlyActivity } from '../../services/data-fetch';
 import { Subscription, forkJoin, interval } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { Chart, ChartConfiguration, registerables } from 'chart.js';
+import { Chart, registerables } from 'chart.js';
+import { DataFetchRealtimeService } from '../../services/data-fetch-realtime';
 
 Chart.register(...registerables);
 
@@ -16,38 +17,237 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('monthlySalesChart') monthlySalesCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('hourlyActivityChart') hourlyActivityCanvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('countryOrdersChart') countryOrdersCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('anomaliesChart') anomaliesCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('devicesChart') devicesCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('trendingChart') trendingCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('sessionsChart') sessionsCanvas!: ElementRef<HTMLCanvasElement>;
 
   private analyticsSubscription?: Subscription;
   private pollingSubscription?: Subscription;
+  private realtimeSubscription?: Subscription;
+  // WebSocket connections for real-time streaming
+  private anomaliesWs?: WebSocket;
+  private devicesWs?: WebSocket;
+  private trendingWs?: WebSocket;
+  private sessionsWs?: WebSocket;
   private monthlySalesChart?: Chart;
   private hourlyActivityChart?: Chart;
   private countryOrdersChart?: Chart;
+  private anomaliesChart?: Chart;
+  private devicesChart?: Chart;
+  private trendingChart?: Chart;
+  private sessionsChart?: Chart;
 
   monthlySpendData: MonthlySpend[] = [];
   countryOrdersData: CountryOrders[] = [];
   hourlyActivityData: HourlyActivity[] = [];
+  anomaliesData: any[] = [];
+  devicesData: any[] = [];
+  trendingData: any[] = [];
+  sessionsData: any[] = [];
   
   totalSales: number = 0;
   peakHour: number = 0;
   topCountry: string = '';
 
-  constructor(private dataFetchService: DataFetchService) {}
+  constructor(private dataFetchService: DataFetchService, private dataFetchRealtimeService: DataFetchRealtimeService) {}
 
   ngOnInit(): void {
     this.loadAnalytics();
     this.startPolling();
+    this.connectWebSockets();
+  }
+
+  loadRealtimeData(): void {
+    // Load each dataset independently - don't wait for all to complete
+    this.dataFetchRealtimeService.fetchAnomalies().subscribe({
+      next: (data) => {
+        console.log('Anomalies loaded:', data.length, 'items');
+        console.log('Anomalies preview:', data.slice(0, 3));
+        this.anomaliesData = data;
+        this.updateAnomaliesChart();
+      },
+      error: (err) => console.error('Error fetching anomalies:', err)
+    });
+
+    this.dataFetchRealtimeService.fetchDevices().subscribe({
+      next: (data) => {
+        console.log('Devices loaded:', data.length, 'items');
+        console.log('Devices preview:', data.slice(0, 3));
+        this.devicesData = data;
+        this.updateDevicesChart();
+      },
+      error: (err) => console.error('Error fetching devices:', err)
+    });
+
+    this.dataFetchRealtimeService.fetchTrending().subscribe({
+      next: (data) => {
+        console.log('Trending loaded:', data.length, 'items');
+        console.log('Trending preview:', data.slice(0, 3));
+        this.trendingData = data;
+        this.updateTrendingChart();
+      },
+      error: (err) => console.error('Error fetching trending:', err)
+    });
+
+    this.dataFetchRealtimeService.fetchSessions().subscribe({
+      next: (data) => {
+        console.log('Sessions loaded:', data.length, 'items');
+        console.log('Sessions preview:', data.slice(0, 3));
+        this.sessionsData = data;
+        this.updateSessionsChart();
+      },
+      error: (err) => console.error('Error fetching sessions:', err)
+    });
+  }
+
+  connectWebSockets(): void {
+    console.log('Connecting to WebSockets for real-time streaming...');
+
+    // Anomalies WebSocket - receives batches
+    this.anomaliesWs = this.dataFetchRealtimeService.connectAnomaliesWebSocket((dataBatch) => {
+      console.log(`Anomaly batch received: ${dataBatch.length} items`);
+      this.anomaliesData = [...dataBatch, ...this.anomaliesData].slice(0, 100);
+      this.updateAnomaliesChart();
+    });
+
+    // Devices WebSocket - receives batches
+    this.devicesWs = this.dataFetchRealtimeService.connectDevicesWebSocket((dataBatch) => {
+      console.log(`Device batch received: ${dataBatch.length} items`);
+      this.devicesData = [...dataBatch, ...this.devicesData].slice(0, 100);
+      this.updateDevicesChart();
+    });
+
+    // Trending WebSocket - receives batches
+    this.trendingWs = this.dataFetchRealtimeService.connectTrendingWebSocket((dataBatch) => {
+      console.log(`Trending batch received: ${dataBatch.length} items`);
+      this.trendingData = [...dataBatch, ...this.trendingData].slice(0, 100);
+      this.updateTrendingChart();
+    });
+
+    // Sessions WebSocket - receives batches
+    this.sessionsWs = this.dataFetchRealtimeService.connectSessionsWebSocket((dataBatch) => {
+      console.log(`Session batch received: ${dataBatch.length} items`);
+      this.sessionsData = [...dataBatch, ...this.sessionsData].slice(0, 100);
+      this.updateSessionsChart();
+    });
+  }
+
+  // Individual chart update methods for WebSocket streaming
+  updateAnomaliesChart(): void {
+    if (this.anomaliesChart && this.anomaliesData.length > 0) {
+      const recentAnomalies = [...this.anomaliesData]
+        .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+        .slice(0, 10);
+      const timeLabels = recentAnomalies.map(item => {
+        const date = new Date(item.event_timestamp);
+        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      }).reverse();
+      const actionsData = recentAnomalies.map(item => item.actions_count).reverse();
+      
+      this.anomaliesChart.data.labels!.length = 0;
+      this.anomaliesChart.data.labels!.push(...timeLabels);
+      this.anomaliesChart.data.datasets[0].data.length = 0;
+      (this.anomaliesChart.data.datasets[0].data as number[]).push(...actionsData);
+      this.anomaliesChart.update('active');
+    }
+  }
+
+  updateDevicesChart(): void {
+    if (this.devicesChart && this.devicesData.length > 0) {
+      const deviceTotals = this.devicesData.reduce((acc, item) => {
+        const type = (item.device_type || 'UNKNOWN').toUpperCase();
+        acc[type] = (acc[type] || 0) + (item.device_count || 1);
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const deviceValues = [
+        deviceTotals['MOBILE'] || 0,
+        deviceTotals['DESKTOP'] || 0,
+        deviceTotals['TABLET'] || 0
+      ];
+      
+      this.devicesChart.data.datasets[0].data.length = 0;
+      (this.devicesChart.data.datasets[0].data as number[]).push(...deviceValues);
+      this.devicesChart.update('active');
+    }
+  }
+
+  updateTrendingChart(): void {
+    if (this.trendingChart && this.trendingData.length > 0) {
+      const topTrending = [...this.trendingData]
+        .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
+        .slice(0, 10);
+      const pageLabels = topTrending.map(item => item.page_section || 'Unknown');
+      const viewCounts = topTrending.map(item => item.visit_count || 0);
+      
+      this.trendingChart.data.labels!.length = 0;
+      this.trendingChart.data.labels!.push(...pageLabels);
+      this.trendingChart.data.datasets[0].data.length = 0;
+      (this.trendingChart.data.datasets[0].data as number[]).push(...viewCounts);
+      this.trendingChart.update('active');
+    }
+  }
+
+  updateSessionsChart(): void {
+    if (this.sessionsChart && this.sessionsData.length > 0) {
+      const recentSessions = [...this.sessionsData]
+        .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+        .slice(0, 10);
+      const sessionLabels = recentSessions.map(item => {
+        const date = new Date(item.event_timestamp);
+        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+      }).reverse();
+      const sessionCounts = recentSessions.map(item => item.events_in_session || 1).reverse();
+      
+      this.sessionsChart.data.labels!.length = 0;
+      this.sessionsChart.data.labels!.push(...sessionLabels);
+      this.sessionsChart.data.datasets[0].data.length = 0;
+      (this.sessionsChart.data.datasets[0].data as number[]).push(...sessionCounts);
+      this.sessionsChart.update('active');
+    }
+  }
+
+  updateRealtimeCharts(): void {
+    // Call individual chart update methods
+    this.updateAnomaliesChart();
+    this.updateTrendingChart();
+    this.updateSessionsChart();
+    this.updateDevicesChart();
+  }
+
+  processRealtimeData(): void {
+    this.createAnomaliesChart();
+    this.createDevicesChart();
+    this.createTrendingChart();
+    this.createSessionsChart();
   }
 
   ngAfterViewInit(): void {
-    // Charts will be created after data is loaded
+    console.log('Initializing realtime charts (empty, waiting for WebSocket data)');
+    this.createAnomaliesChart();
+    this.createDevicesChart();
+    this.createTrendingChart();
+    this.createSessionsChart();
   }
 
   ngOnDestroy(): void {
     this.analyticsSubscription?.unsubscribe();
     this.pollingSubscription?.unsubscribe();
+    this.realtimeSubscription?.unsubscribe();
+    // Close WebSocket connections
+    this.anomaliesWs?.close();
+    this.devicesWs?.close();
+    this.trendingWs?.close();
+    this.sessionsWs?.close();
+    // Destroy charts
     this.monthlySalesChart?.destroy();
     this.hourlyActivityChart?.destroy();
     this.countryOrdersChart?.destroy();
+    this.anomaliesChart?.destroy();
+    this.devicesChart?.destroy();
+    this.trendingChart?.destroy();
+    this.sessionsChart?.destroy();
   }
 
   startPolling(): void {
@@ -63,6 +263,7 @@ export class Dashboard implements OnInit, OnDestroy, AfterViewInit {
       .subscribe({
         next: (data) => {
           console.log('Data refreshed at:', new Date().toLocaleTimeString());
+          console.log('Received data:', data);
           this.monthlySpendData = data.monthlySpend;
           this.countryOrdersData = data.countryOrders;
           this.hourlyActivityData = data.hourlyActivity;
@@ -243,5 +444,198 @@ createCountryOrdersChart(): void {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
+  }
+
+  createAnomaliesChart(): void {
+    if (this.anomaliesChart) {
+      this.updateRealtimeCharts();
+      return;
+    }
+
+    const ctx = this.anomaliesCanvas?.nativeElement?.getContext('2d');
+    if (!ctx) return;
+
+    // Sort by timestamp and get recent data
+    const recentAnomalies = [...this.anomaliesData]
+      .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+      .slice(0, 10);
+    const timeLabels = recentAnomalies.map(item => {
+      const date = new Date(item.event_timestamp);
+      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }).reverse();
+    const actionsData = recentAnomalies.map(item => item.actions_count || 0).reverse();
+
+    this.anomaliesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: timeLabels,
+        datasets: [{
+          label: 'Actions Count',
+          data: actionsData,
+          borderColor: 'rgba(245, 87, 108, 1)',
+          backgroundColor: 'rgba(245, 87, 108, 0.1)',
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: this.anomaliesData.slice(0, 10).map(item => 
+            item.is_anomaly ? 'rgba(255, 0, 0, 1)' : 'rgba(245, 87, 108, 1)'
+          ).reverse()
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Actions: ${context.parsed.y}`
+            }
+          }
+        },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Actions' } } }
+      }
+    });
+  }
+
+  createDevicesChart(): void {
+    if (this.devicesChart) {
+      this.updateRealtimeCharts();
+      return;
+    }
+
+    const ctx = this.devicesCanvas?.nativeElement?.getContext('2d');
+    if (!ctx) return;
+
+    // Aggregate device counts by type
+    const deviceTotals = this.devicesData.reduce((acc, item) => {
+      const type = (item.device_type || 'UNKNOWN').toUpperCase();
+      acc[type] = (acc[type] || 0) + (item.device_count || 1);
+      return acc;
+    }, {} as Record<string, number>);
+
+    this.devicesChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Mobile', 'Desktop', 'Tablet'],
+        datasets: [{
+          data: [
+            deviceTotals['MOBILE'] || 0,
+            deviceTotals['DESKTOP'] || 0,
+            deviceTotals['TABLET'] || 0
+          ],
+          backgroundColor: [
+            'rgba(79, 172, 254, 0.8)',
+            'rgba(240, 147, 251, 0.8)',
+            'rgba(67, 233, 123, 0.8)'
+          ],
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${context.parsed} events`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  createTrendingChart(): void {
+    if (this.trendingChart) {
+      this.updateRealtimeCharts();
+      return;
+    }
+
+    const ctx = this.trendingCanvas?.nativeElement?.getContext('2d');
+    if (!ctx) return;
+
+    // Get top trending pages by visit_count
+    const topTrending = [...this.trendingData]
+      .sort((a, b) => (b.visit_count || 0) - (a.visit_count || 0))
+      .slice(0, 10);
+    const pageLabels = topTrending.map(item => item.page_section || 'Unknown');
+    const viewCounts = topTrending.map(item => item.visit_count || 0);
+
+    this.trendingChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: pageLabels,
+        datasets: [{
+          label: 'Page Views',
+          data: viewCounts,
+          backgroundColor: 'rgba(56, 249, 215, 0.8)',
+          borderColor: 'rgba(67, 233, 123, 1)',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Views: ${context.parsed.x}`
+            }
+          }
+        },
+        scales: { x: { beginAtZero: true, title: { display: true, text: 'Views' } } }
+      }
+    });
+  }
+
+  createSessionsChart(): void {
+    if (this.sessionsChart) {
+      this.updateRealtimeCharts();
+      return;
+    }
+
+    const ctx = this.sessionsCanvas?.nativeElement?.getContext('2d');
+    if (!ctx) return;
+
+    // Sort by timestamp and show session activity over time
+    const recentSessions = [...this.sessionsData]
+      .sort((a, b) => new Date(b.event_timestamp).getTime() - new Date(a.event_timestamp).getTime())
+      .slice(0, 10);
+    const sessionLabels = recentSessions.map(item => {
+      const date = new Date(item.event_timestamp);
+      return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }).reverse();
+    const sessionCounts = recentSessions.map(item => item.events_in_session || 1).reverse();
+
+    this.sessionsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: sessionLabels,
+        datasets: [{
+          label: 'Active Sessions',
+          data: sessionCounts,
+          borderColor: 'rgba(79, 172, 254, 1)',
+          backgroundColor: 'rgba(79, 172, 254, 0.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `Sessions: ${context.parsed.y}`
+            }
+          }
+        },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'Sessions' } } }
+      }
+    });
   }
 }

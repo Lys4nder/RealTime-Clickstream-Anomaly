@@ -19,6 +19,22 @@ export interface HourlyActivity {
   count: number;
 }
 
+export interface Anomaly {
+  [key: string]: any;
+}
+
+export interface Device {
+  [key: string]: any;
+}
+
+export interface TrendingPage {
+  [key: string]: any;
+}
+
+export interface Session {
+  [key: string]: any;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -44,21 +60,21 @@ export class DataFetchService {
     }
 
     fetchMonthlySpend(): Observable<MonthlySpend[]> {
-        return this.http.get<MonthlySpend[]>(`${this.apiUrl}/monthly-sales`).pipe(
+        return this.http.get<MonthlySpend[]>(`${this.apiUrl}/batch/monthly-sales`).pipe(
             this.retryWithBackoff(),
             catchError((error) => this.handleError(error, 'monthly sales data'))
         );
     }
 
     fetchCountryOrders(): Observable<CountryOrders[]> {
-        return this.http.get<CountryOrders[]>(`${this.apiUrl}/country-stats`).pipe(
+        return this.http.get<CountryOrders[]>(`${this.apiUrl}/batch/country-stats`).pipe(
             this.retryWithBackoff(),
             catchError((error) => this.handleError(error, 'country statistics'))
         );
     }
 
     fetchHourlyActivity(): Observable<HourlyActivity[]> {
-        return this.http.get<HourlyActivity[]>(`${this.apiUrl}/hourly-peaks`).pipe(
+        return this.http.get<HourlyActivity[]>(`${this.apiUrl}/batch/hourly-peaks`).pipe(
             this.retryWithBackoff(),
             catchError((error) => this.handleError(error, 'hourly activity data'))
         );
