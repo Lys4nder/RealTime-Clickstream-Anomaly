@@ -31,6 +31,8 @@ def get_spark_session(app_name="MyApp", cores="2") -> SparkSession:
             "spark.sql.catalog.spark_catalog",
             "org.apache.spark.sql.delta.catalog.DeltaCatalog",
         )
+        # Performance: reduce default shuffle partitions for smaller clusters/local dev
+        .config("spark.sql.shuffle.partitions", "4")
         .config("spark.hadoop.fs.s3a.access.key", s3_key)
         .config("spark.hadoop.fs.s3a.secret.key", s3_secret)
         .config("spark.hadoop.fs.s3a.path.style.access", s3_path_style)

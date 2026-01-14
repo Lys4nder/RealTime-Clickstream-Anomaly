@@ -3,7 +3,7 @@ import uuid
 import json
 import logging
 from duckdb import DuckDBPyConnection
-from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from aiokafka import AIOKafkaConsumer
 
 from src.dependencies import get_db_connection

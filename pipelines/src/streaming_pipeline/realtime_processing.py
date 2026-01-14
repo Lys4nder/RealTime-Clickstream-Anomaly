@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     session_window,
@@ -13,6 +14,7 @@ from pyspark.sql.functions import (
     current_timestamp,
     to_json,
     struct,
+    approx_count_distinct,
 )
 from pyspark.sql.types import (
     StructType,
@@ -65,19 +67,34 @@ schema = StructType(
 
 
 def write_to_delta_and_kafka(batch_df, batch_id, delta_path, kafka_topic):
-    # 1. WRITE TO DELTA (History / Single Source of Truth)
-    batch_df.write.format("delta").mode("append").option("mergeSchema", "true").save(
-        delta_path
-    )
+    # Persist the batch so the two writers don't recompute the aggregation.
+    batch_df.persist()
+    try:
 
-    # 2. WRITE TO KAFKA (Real-Time Stream)
-    (
-        batch_df.select(to_json(struct("*")).alias("value"))
-        .write.format("kafka")
-        .option("kafka.bootstrap.servers", KAFKA_BROKER)
-        .option("topic", kafka_topic)
-        .save()
-    )
+        def write_delta():
+            batch_df.write.format("delta").mode("append").option(
+                "mergeSchema", "true"
+            ).save(delta_path)
+
+        def write_kafka():
+            (
+                batch_df.select(to_json(struct("*")).alias("value"))
+                .write.format("kafka")
+                .option("kafka.bootstrap.servers", KAFKA_BROKER)
+                .option("topic", kafka_topic)
+                .save()
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(write_delta)
+            f2 = executor.submit(write_kafka)
+            f1.result()
+            f2.result()
+    finally:
+        try:
+            batch_df.unpersist()
+        except Exception:
+            pass
 
 
 def run_streaming(spark: SparkSession):
@@ -96,29 +113,56 @@ def run_streaming(spark: SparkSession):
         .select("data.*")
     )
 
-    # 1. SILVER LAYER (High Priority - Fast Write)
-    silver_write_df = json_stream.withColumn("ingested_at", current_timestamp())
-    query_silver = (
-        silver_write_df.writeStream.outputMode("append")
-        .format("delta")
-        .option("checkpointLocation", CHECKPOINT_PATH_SILVER)
-        .option("path", OUTPUT_PATH_SILVER)
-        .trigger(processingTime="2 seconds")
-        .start()
-    )
+    # # 1. SILVER LAYER (High Priority - Fast Write)
+    # silver_write_df = json_stream.withColumn("ingested_at", current_timestamp())
+    # query_silver = (
+    #     silver_write_df.writeStream.outputMode("append")
+    #     .format("delta")
+    #     .option("checkpointLocation", CHECKPOINT_PATH_SILVER)
+    #     .option("path", OUTPUT_PATH_SILVER)
+    #     .trigger(processingTime="2 seconds")
+    #     .start()
+    # )
 
     # 2. ANOMALY DETECTION (Medium Priority)
+    # Logic: 10s window sliding every 5s.
+    # Flags:
+    #   1. High Velocity: > 50 actions in 10s
+    #   2. Scraper Behavior: Viewing > 5 unique products in 10s (Human usually views 1-2)
     anomaly_df = (
-        json_stream.withWatermark("event_timestamp", "1 second")
+        json_stream.withWatermark("event_timestamp", "1 minute")
         .groupBy(
-            window(col("event_timestamp"), "5 seconds", "1 second"),
+            window(col("event_timestamp"), "10 seconds", "5 seconds"),
             col("user_id"),
-            col("country"),
+            col("country"),  # Grouping by country is safe now
         )
-        .agg(count("*").alias("actions_count"))
-        .withColumn("is_anomaly", when(col("actions_count") > 5, True).otherwise(False))
+        .agg(
+            count("*").alias("actions_count"),
+            approx_count_distinct("product_code").alias("unique_products_viewed"),
+        )
+        # Define Rules for Fake Data
+        .withColumn("is_high_velocity", col("actions_count") > 50)
+        .withColumn("is_scraper", col("unique_products_viewed") > 5)
+        # Filter: Only keep anomalies
+        .filter(col("is_high_velocity") | col("is_scraper"))
+        # Metadata / Formatting
         .withColumn("processed_at", current_timestamp())
         .withColumn("event_timestamp", col("window").getField("start"))
+        .withColumn(
+            "anomaly_reason",
+            when(col("is_scraper"), "Potential Scraper (High Variety)").otherwise(
+                "High Velocity Bot"
+            ),
+        )
+        # Select Output (Preserves your original schema structure)
+        .select(
+            "event_timestamp",
+            "user_id",
+            "country",
+            "actions_count",
+            "anomaly_reason",
+            "processed_at",
+        )
     )
 
     query_anomaly = (
@@ -129,10 +173,9 @@ def run_streaming(spark: SparkSession):
             )
         )
         .option("checkpointLocation", CHECKPOINT_PATH_ANOMALY)
-        .trigger(processingTime="10 seconds")
+        .trigger(processingTime="60 seconds")
         .start()
     )
-
     # 3. DEVICE STATS (Low Priority)
     device_stats_df = (
         json_stream.withWatermark("event_timestamp", "1 second")
@@ -152,7 +195,7 @@ def run_streaming(spark: SparkSession):
             )
         )
         .option("checkpointLocation", CHECKPOINT_PATH_DEVICES)
-        .trigger(processingTime="30 seconds")
+        .trigger(processingTime="60 seconds")
         .start()
     )
 
@@ -175,7 +218,7 @@ def run_streaming(spark: SparkSession):
             )
         )
         .option("checkpointLocation", CHECKPOINT_PATH_TRENDING)
-        .trigger(processingTime="30 seconds")
+        .trigger(processingTime="60 seconds")
         .start()
     )
 
@@ -202,7 +245,7 @@ def run_streaming(spark: SparkSession):
             )
         )
         .option("checkpointLocation", CHECKPOINT_PATH_SESSIONS)
-        .trigger(processingTime="30 seconds")
+        .trigger(processingTime="60 seconds")
         .start()
     )
 

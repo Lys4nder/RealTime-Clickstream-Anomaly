@@ -89,7 +89,7 @@ services:
     user: root
     environment:
       - SPARK_WORKER_WEBUI_PORT=8081
-      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_CORES=4
       - SPARK_WORKER_MEMORY=2G
       - SPARK_MASTER=spark://spark-master:7077
       - AWS_ACCESS_KEY_ID=minioadmin
@@ -109,7 +109,7 @@ services:
     environment:
       - SPARK_WORKER_WEBUI_PORT=8081
       - SPARK_WORKER_CORES=4
-      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_MEMORY=6G
       - SPARK_MASTER=spark://spark-master:7077
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
@@ -189,7 +189,7 @@ services:
     environment:
       - KAFKA_BROKER=kafka:29092
       - KAFKA_TOPIC=clickstream_events
-      - NUM_THREADS=8
+      - NUM_THREADS=12
       - RUST_LOG=info
       - MAX_EVENTS=1000
     restart: always
