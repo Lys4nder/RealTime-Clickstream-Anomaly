@@ -12,12 +12,19 @@ services:
     container_name: kafka
     ports:
       - "9092:9092"
+
+    healthcheck:
+      # Check if we can list topics (verifies Zookeeper + Broker connection)
+      test: ["CMD", "kafka-topics.sh", "--list", "--zookeeper", "zookeeper:2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     environment:
       # Connect to Zookeeper
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       
       # "clickstream_events" with 1 partition and 1 replica
-      KAFKA_CREATE_TOPICS: "clickstream_events:1:1"
+      KAFKA_CREATE_TOPICS: "clickstream_events:1:1,stats_anomalies:1:1,stats_devices:1:1,stats_trending:1:1,stats_sessions:1:1"
       
       # network endpoints
       KAFKA_LISTENERS: INSIDE://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
@@ -74,16 +81,16 @@ services:
     networks:
       - app-tier
 
-  spark-worker:
+  spark-worker-1:
     image: my-spark-cluster
-    container_name: spark-worker
+    container_name: spark-worker-1
     depends_on:
       - spark-master
     user: root
     environment:
       - SPARK_WORKER_WEBUI_PORT=8081
-      - SPARK_WORKER_CORES=1
-      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=2G
       - SPARK_MASTER=spark://spark-master:7077
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
@@ -93,7 +100,25 @@ services:
     command: "/opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
     networks:
       - app-tier
-
+  spark-worker-2:
+    image: my-spark-cluster
+    container_name: spark-worker-2
+    depends_on:
+      - spark-master
+    user: root
+    environment:
+      - SPARK_WORKER_WEBUI_PORT=8081
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=6G
+      - SPARK_MASTER=spark://spark-master:7077
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_REGION=us-east-1
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_S3_PATH_STYLE=true
+    command: "/opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077"
+    networks:
+      - app-tier 
   batch-job:
     image: my-spark-cluster
     container_name: batch-job
@@ -101,7 +126,6 @@ services:
       - minio
       - minio-init
       - spark-master
-      - spark-worker
     environment:
       - AWS_S3_ENDPOINT=http://minio:9000
       - AWS_ACCESS_KEY_ID=minioadmin
@@ -118,7 +142,39 @@ services:
     command: python3 /app/src/ingest_pipeline_batch/batch_processing.py
     networks:
       - app-tier
-
+  realtime-pipeline:
+    image: my-spark-cluster
+    container_name: realtime-pipeline
+    depends_on:
+      - minio
+      - kafka
+      - zookeeper
+      - clickstream-producer             
+      - spark-master
+    environment:
+      # 1. Spark-MinIO Connection (Used by Hadoop/S3A under the hood)
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_REGION=us-east-1
+      - AWS_S3_PATH_STYLE=true
+      
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - KAFKA_BROKER=kafka:29092        
+      - KAFKA_TOPIC=clickstream_events
+      
+      # 3. Spark Cluster Networking
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_DRIVER_HOST=realtime-pipeline  
+      - SPARK_DRIVER_BIND_ADDRESS=0.0.0.0
+    volumes:
+      - ./pipelines/src:/app/src
+    # Update this path if you put the file in a subfolder like /ingest_pipeline_realtime/
+    command: python3 /app/src/streaming_pipeline/realtime_processing.py
+    networks:
+      - app-tier
 # 4. Producer: Clickstream Events Producer
   clickstream-producer:
     build: 
@@ -126,16 +182,17 @@ services:
       dockerfile: Dockerfile
     
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     
     # Connection details
     environment:
       - KAFKA_BROKER=kafka:29092
       - KAFKA_TOPIC=clickstream_events
-      - NUM_THREADS=1
+      - NUM_THREADS=12
       - RUST_LOG=info
       - MAX_EVENTS=1000
-    
+    restart: always
     networks:
       - app-tier
 
