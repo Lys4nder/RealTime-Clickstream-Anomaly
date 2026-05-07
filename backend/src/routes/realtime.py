@@ -12,6 +12,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("RealTimeAPI")
 
 
+# Ahoy! Keep Kafka broker config in one place fer all realtime streams.
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 
 
@@ -31,8 +32,10 @@ async def consume_stream(websocket: WebSocket, topic: str):
     """
     Generic handler that connects a WebSocket to a specific Kafka topic.
     """
+    # Ahoy! Accept the socket first so the crew can start receiving updates.
     await websocket.accept()
 
+    # Argh! Unique consumer groups keep each dashboard client on its own course.
     consumer_group = f"dashboard-{uuid.uuid4()}"
 
     consumer = AIOKafkaConsumer(
@@ -43,6 +46,7 @@ async def consume_stream(websocket: WebSocket, topic: str):
     )
 
     try:
+        # Ahoy! Start listening to fresh Kafka messages for this topic.
         await consumer.start()
         logger.info(
             f"Client connected to topic '{topic}' with group '{consumer_group}'"
@@ -50,6 +54,7 @@ async def consume_stream(websocket: WebSocket, topic: str):
 
         async for msg in consumer:
             try:
+                # Argh! Decode JSON payloads before sending 'em over the socket.
                 payload = json.loads(msg.value.decode("utf-8"))
 
                 await websocket.send_json(payload)
@@ -62,9 +67,11 @@ async def consume_stream(websocket: WebSocket, topic: str):
         logger.error(f"Error in stream {topic}: {e}")
         await websocket.close()
     finally:
+        # Ahoy! Always stop the consumer so no background sailors are left adrift.
         await consumer.stop()
 
 
+# Ahoy! WebSocket routes: each endpoint maps to one live Kafka stats topic.
 @router.websocket("/ws/anomalies")
 async def ws_anomalies(websocket: WebSocket):
     await consume_stream(websocket, "stats_anomalies")
@@ -85,6 +92,7 @@ async def ws_sessions(websocket: WebSocket):
     await consume_stream(websocket, "stats_sessions")
 
 
+# Argh! REST routes: fetch current snapshots from Gold Delta tables.
 @router.get("/anomalies")
 def get_anomalies(conn: DuckDBPyConnection = Depends(get_db_connection)):
     query = f"SELECT * FROM delta_scan('{PATH_GOLD_ANOMALY}')"
